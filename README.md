@@ -27,8 +27,11 @@ Many things can change throughout its lifecycle, many things are way too simple 
 
 
 ### TODOS
+- [ ] Attribute system rework (allow for custom attribute buffer types, [glTF 2.0 spec](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes))
 - [ ] Cubemap rendering for passes and shadows as well (Point light and Area light)
 - [ ] Use a general texture projector system for shadows (reduces varying count for old GPUs)
+- [ ] LOD system (tessellation is not available, so it has to be done manually)
+- [ ] Shape keys support for gltf models
 - [ ] Simplify custom shaders (QOL improvements like function overriding)
 - [ ] Frustum culling
 - [ ] Physics engine implementation (considered: [box3d](https://github.com/erincatto/box3d))
