@@ -390,11 +390,12 @@ class FoxRenderer {
 			context.__bindGLTextureCubeMap(glTexture.__textureID);
 		}
 
-		context.setTextureAt(sampler, glTexture);
-		context.setSamplerStateAt(sampler, cast texture.wrapMode, cast texture.filter, 
-			cast texture.mipFilter);
-		// __flushGLTextures() but cut-down
-		glTexture.__setSamplerState(context.__state.samplerStates[sampler]);
+		if(texture.__paramsNeedUpdate) {
+			context.setTextureAt(sampler, glTexture);
+			context.setSamplerStateAt(sampler, cast texture.wrapMode, cast texture.filter, cast texture.mipFilter);
+			glTexture.__setSamplerState(context.__state.samplerStates[sampler]);
+			texture.__paramsNeedUpdate = false;
+		}
 		
 	}
 
@@ -407,8 +408,9 @@ class FoxRenderer {
 			// Missing texture check
 			if(tex?.glTexture == null) tex = FoxRenderer.MISSING_TEXTURE;
 
-			context.setTextureAt(sampler, tex.glTexture);
-			context.setSamplerStateAt(sampler, cast tex.wrapMode, cast tex.filter, cast tex.mipFilter);
+			//context.setTextureAt(sampler, tex.glTexture);
+			//context.setSamplerStateAt(sampler, cast tex.wrapMode, cast tex.filter, cast tex.mipFilter);
+			useTexture(sampler, tex);
 			GL.uniform1i(cast t.location, sampler);
 			sampler += 1;
 		}
@@ -478,7 +480,7 @@ class FoxRenderer {
 		context.__flushGLDepth();
 		//context.__flushGLScissor();
 		//
-		context.__flushGLTextures(); // This reallocates sampler states internally and activates/binds texture units
+		//context.__flushGLTextures(); // This reallocates sampler states internally and activates/binds texture units
 
 		// Actual depth test here
 		if(FoxRenderer.__depthTest != material.depthTest) {
@@ -557,7 +559,7 @@ class FoxRenderer {
 		}
 		context.__flushGLCulling(); 
 		context.__flushGLDepth();
-		context.__flushGLTextures();
+		//context.__flushGLTextures();
 
 		FoxRenderer.stateSwitches += 1;
 		return sampler;

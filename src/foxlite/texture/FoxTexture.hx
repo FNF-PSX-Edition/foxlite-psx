@@ -18,14 +18,34 @@ import openfl.display3D.textures.RectangleTexture;
 class FoxTexture {
 	public var context:Context3D = null;
 
-	public var wrapMode:FoxWrapMode;
-	public var filter:FoxTextureFilter;
-	public var mipFilter:FoxMipFilter;
+	public var wrapMode(default, set):FoxWrapMode;
+	public var filter(default, set):FoxTextureFilter;
+	public var mipFilter(default, set):FoxMipFilter;
 	public var glTexture:TextureBase; // Fix C++ black textures via downcast
 	public var assetsKey:String;
 
 	public var width(get, default):Int;
 	public var height(get, default):Int;
+
+	public var __paramsNeedUpdate:Bool = true;
+
+	private function set_wrapMode(v:FoxWrapMode):FoxWrapMode {
+		if(this.wrapMode == v) return v;
+		__paramsNeedUpdate = true;
+		return this.wrapMode = v;
+	}
+
+	private function set_filter(v:FoxTextureFilter):FoxTextureFilter {
+		if(this.filter == v) return v;
+		__paramsNeedUpdate = true;
+		return this.filter = v;
+	}
+
+	private function set_mipFilter(v:FoxMipFilter):FoxMipFilter {
+		if(this.mipFilter == v) return v;
+		__paramsNeedUpdate = true;
+		return this.mipFilter = v;
+	}
 
 	private function get_width():Int {
 		return glTexture?.__width ?? 0;
