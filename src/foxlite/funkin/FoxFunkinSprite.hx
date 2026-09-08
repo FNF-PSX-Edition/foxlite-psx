@@ -45,10 +45,22 @@ class FoxFunkinSprite extends FoxFlxSprite {
 	var __prevGraphicHeight:Int = 0;
 	var _matrix:FlxMatrix;
 
-	public function new(target:FunkinSprite, ?shader_:FoxShader, ?spritePixelSize:Float) {
-		var material_ = FoxMaterial.create(shader_ ?? FoxShader.fromAsset(FoxShader.BASIC));
-		material_.shadowCulling = FoxTriangleFace.NONE; // Render shadow for front and back faces
-		super(target, material_, spritePixelSize);
+	/**
+		Creates a 3D sprite from a `FlxAnimate` sprite, although it falls back to `FoxFlxSprite` if it's not detected.
+
+		@param materialOrShader For backwards compatibility reasons, you can provide either a `FoxShader` (a material
+		will be created for you) or a `FoxMaterial` with a shader included (to be on par with `FoxFlxSprite`)
+	**/
+	public function new(target:FunkinSprite, materialOrShader:Any, ?spritePixelSize:Float) {
+		var _material:FoxMaterial = null;
+
+		if(Std.isOfType(materialOrShader, FoxShader)) {
+			_material = FoxMaterial.create((materialOrShader:FoxShader) ?? FoxShader.fromAsset(FoxShader.BASIC));
+			_material.shadowCulling = FoxTriangleFace.NONE; // Render shadow for front and back faces
+		}
+		else if(Std.isOfType(materialOrShader, FoxMaterial)) _material = materialOrShader;
+		
+		super(target, _material, spritePixelSize);
 	}
 
 	public override function calculateMesh() {
