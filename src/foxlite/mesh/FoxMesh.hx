@@ -59,6 +59,9 @@ class FoxMesh {
 	public var context:Context3D = null;
 	public var __isCopy:Bool = false;
 
+	public var raycastVerts:Array<Float> = null;
+	public var raycastIndices:Array<Int> = null;
+
 	public function new(?mat:FoxMaterial):Void {
 		context = FoxRenderer.getContext();
 		this.material = mat;
@@ -187,9 +190,11 @@ class FoxMesh {
 		Creates buffers and uploads data to the GPU.
 	**/
 	public function setArrays(?vertices:Array<Float>, ?uvtData:Array<Float>, ?indices:Array<Int>, ?material_:FoxMaterial, ?normals:Array<Float>, ?colors:Array<Float>, ?weights:Array<Float>, ?influences:Array<Int>) {
-		if(material_ != null) material = material_;
+		if (material_ != null) material = material_;
+		if (vertices != null) raycastVerts = vertices;
+		if (indices != null) raycastIndices = indices;
 
-		if(vertices?.length > 0) {
+		if (vertices?.length > 0) {
 			vertexBuffer?.dispose();
 			vertexBuffer = context.createVertexBuffer(Std.int(vertices.length / 3), 3);
 			vertexBuffer.__usage = bufferUsage;
@@ -197,7 +202,7 @@ class FoxMesh {
 			FoxRenderer.allocationsThisFrame += 1;
 		}
 
-		if(uvtData?.length > 0) {
+		if (uvtData?.length > 0) {
 			uvBuffer?.dispose();
 			uvBuffer = context.createVertexBuffer(Std.int(uvtData.length / 2), 2);
 			uvBuffer.__usage = bufferUsage;
@@ -205,14 +210,14 @@ class FoxMesh {
 			FoxRenderer.allocationsThisFrame += 1;
 		}
 
-		if(indices?.length > 0) {
+		if (indices?.length > 0) {
 			indexBuffer?.dispose();
 			indexBuffer = context.createIndexBuffer(indices.length);
 			setIndexBuffer(indices); // Upload to GPU
 			FoxRenderer.allocationsThisFrame += 1;
 		}
 
-		if(normals?.length > 0) {
+		if (normals?.length > 0) {
 			normalBuffer?.dispose();
 			tangentBuffer?.dispose();
 
@@ -229,7 +234,7 @@ class FoxMesh {
 			if(tangents != null) setBuffer(FoxMeshBufferType.TANGENTS, tangents);
 		}
 
-		if(colors?.length > 0) {
+		if (colors?.length > 0) {
 			colorBuffer?.dispose();
 			colorBuffer = context.createVertexBuffer(Std.int(colors.length / 4), 4);
 			colorBuffer.__usage = bufferUsage;
@@ -239,7 +244,7 @@ class FoxMesh {
 		
 		// For skinning
 
-		if(weights?.length > 0) {
+		if (weights?.length > 0) {
 			boneWeights?.dispose();
 			boneWeights = context.createVertexBuffer(Std.int(weights.length / 4), 4);
 			boneWeights.__usage = bufferUsage;
@@ -247,7 +252,7 @@ class FoxMesh {
 			FoxRenderer.allocationsThisFrame += 1;
 		}
 
-		if(influences?.length > 0) {
+		if (influences?.length > 0) {
 			boneIndices?.dispose();
 			boneIndices = context.createVertexBuffer(Std.int(influences.length / 4), 4);
 			boneIndices.__stride = 4;
