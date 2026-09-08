@@ -9,6 +9,7 @@ import foxlite.loaders.FoxLoaderUtil;
 import foxlite.material.FoxMaterial;
 import foxlite.material.FoxTriangleFace;
 import foxlite.texture.FoxTexture;
+import foxlite.texture.FoxWrapMode;
 import openfl.geom.Vector3D;
 import openfl.Assets;
 
@@ -175,13 +176,18 @@ class FoxMTLLoader {
 	@:noCompletion public static function _loadTexture(name:String):FoxTexture {
 		// Check if image exists relative to our model
 		var relPath = FoxLoaderUtil.filePath(name);
+		var tex:FoxTexture = null;
 		#if cne
-		if(Assets.exists(relPath)) return FoxTexture.fromImageRaw(relPath);
+		if(Assets.exists(relPath)) tex = FoxTexture.fromImageRaw(relPath);
 		// Nothing, load from `images/`
-		return FoxTexture.fromImage(Path.withoutExtension(name));
+		else tex = FoxTexture.fromImage(Path.withoutExtension(name));
 		#else
-		return FoxTexture.fromImageRaw(relPath);
+		tex = FoxTexture.fromImageRaw(relPath);
 		#end
+		if(tex != null) {
+			tex.wrapMode = FoxWrapMode.REPEAT;
+		}
+		return tex;
 	}
 
 }

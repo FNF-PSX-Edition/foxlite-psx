@@ -28,6 +28,11 @@ class FoxMathUtil {
 	public static final __tempVector3 = new Vector3D();
 
 	/**
+		Cache temporary matrices
+	**/
+	public static final __tempMatrix = new Matrix3D();
+
+	/**
 		Cached Identity values so no allocation happens when calling openfl's `Matrix3D.identity()`
 	**/
 	public static final MATRIX_IDENTITY = VectorFactory.Float([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
@@ -139,16 +144,27 @@ class FoxMathUtil {
 		// but we have to use them because doing them in HScript will be slow af
 		// We can't use recompose() because it has a different rotation order
 		// it just messes up our rotations, we need YXZ order to preserve Z rotation:
-		var rot = rotEuler.clone();
+		final rot = __tempVector;
+		rot.copyFrom(rotEuler);
 		rot.scaleBy(radToDeg);
-		if(rot.z != 0) matTRS.appendRotation(rot.z, BACK);
-		if(rot.y != 0) matTRS.appendRotation(rot.y, UP);
-		if(rot.x != 0) matTRS.appendRotation(rot.x, RIGHT);
+		if(rot.z != 0) { matTRS.appendRotation(rot.z, BACK);  FoxRenderer.allocationsThisFrame++; }
+		if(rot.y != 0) { matTRS.appendRotation(rot.y, UP);    FoxRenderer.allocationsThisFrame++; }
+		if(rot.x != 0) { matTRS.appendRotation(rot.x, RIGHT); FoxRenderer.allocationsThisFrame++; }
 
 		matTRS.appendTranslation(pos.x, pos.y, pos.z);
-		FoxRenderer.allocationsThisFrame += 3;
 
 		return matTRS;
+	}
+
+	public static function basisMatrix(matR:Matrix3D, rotEuler:Vector3D):Matrix3D {
+		matR.copyRawDataFrom(MATRIX_IDENTITY); // identity()
+		final rot = __tempVector;
+		rot.copyFrom(rotEuler);
+		rot.scaleBy(radToDeg);
+		if(rot.z != 0) { matR.appendRotation(rot.z, BACK);  FoxRenderer.allocationsThisFrame++; }
+		if(rot.y != 0) { matR.appendRotation(rot.y, UP);    FoxRenderer.allocationsThisFrame++; }
+		if(rot.x != 0) { matR.appendRotation(rot.x, RIGHT); FoxRenderer.allocationsThisFrame++; }
+		return matR;
 	}
 
 	public static function viewMatrix(matRT:Matrix3D, pos:Vector3D, rotEuler:Vector3D):Matrix3D {
@@ -159,19 +175,19 @@ class FoxMathUtil {
 		// but we have to use them because doing them in HScript will be slow af
 		// We can't use recompose() because it has a different rotation order
 		// it just messes up our rotations, we need YXZ order to preserve Z rotation:
-		var rot = rotEuler.clone();
+		final rot = __tempVector;
+		rot.copyFrom(rotEuler);
 		rot.scaleBy(-radToDeg);
-		if(rot.y != 0) matRT.appendRotation(rot.y, UP);
-		if(rot.x != 0) matRT.appendRotation(rot.x, RIGHT);
-		if(rot.z != 0) matRT.appendRotation(rot.z, BACK);
-		FoxRenderer.allocationsThisFrame += 4;
+		if(rot.y != 0) { matRT.appendRotation(rot.y, UP);    FoxRenderer.allocationsThisFrame++; }
+		if(rot.x != 0) { matRT.appendRotation(rot.x, RIGHT); FoxRenderer.allocationsThisFrame++; }
+		if(rot.z != 0) { matRT.appendRotation(rot.z, BACK);  FoxRenderer.allocationsThisFrame++; }
 
 		return matRT;
 	}
 
 	public static function viewMatrixFromTransform(output:Matrix3D, transform:Matrix3D):Matrix3D {
 		output.copyRawDataFrom(MATRIX_IDENTITY); // identity()
-		var pos = __tempVector;
+		final pos = __tempVector;
 		pos.copyFrom(transform.position);
 		pos.negate();
 		output.position = pos;
@@ -180,10 +196,9 @@ class FoxMathUtil {
 		var rot = eulerFromMatrix(transform, __tempVector, scaleFromMatrix(transform, __tempVector2));
 		rot.scaleBy(-radToDeg);
 		
-		if(rot.z != 0) output.appendRotation(rot.z, BACK);
-		if(rot.y != 0) output.appendRotation(rot.y, UP);
-		if(rot.x != 0) output.appendRotation(rot.x, RIGHT);
-		FoxRenderer.allocationsThisFrame += 3;
+		if(rot.z != 0) { output.appendRotation(rot.z, BACK);  FoxRenderer.allocationsThisFrame++; }
+		if(rot.y != 0) { output.appendRotation(rot.y, UP);    FoxRenderer.allocationsThisFrame++; }
+		if(rot.x != 0) { output.appendRotation(rot.x, RIGHT); FoxRenderer.allocationsThisFrame++; }
 		return output;
 	}
 
@@ -195,6 +210,11 @@ class FoxMathUtil {
 	public static function createViewMatrix(pos:Vector3D, rotEuler:Vector3D):Matrix3D {
 		FoxRenderer.allocationsThisFrame += 1;
 		return viewMatrix(new Matrix3D(), pos, rotEuler);
+	}
+
+	public static function createBasisMatrix(rotEuler:Vector3D):Matrix3D {
+		FoxRenderer.allocationsThisFrame += 1;
+		return basisMatrix(new Matrix3D(), rotEuler);
 	}
 
 	public inline static function fastIdentity(matrix:Matrix3D) {
@@ -268,6 +288,84 @@ class FoxMathUtil {
 			e.z = 0;
 		}
 		return e;
+	}
+
+	public static function quaternionFromMatrix(matrix:Matrix3D, ?output:Vector3D):Vector3D {
+		final mat = __tempMatrix;
+		mat.copyRawDataFrom(matrix.rawData);
+
+		var quaternion = mat.decompose(cast 2)[1];
+		FoxRenderer.allocationsThisFrame += 4;
+		if(output == null)
+			return quaternion;
+		
+		output.copyFrom(quaternion);
+		output.w = quaternion.w;
+		return output;
+	}
+
+	/**
+		From OpenFL's Matrix3D.recompose(EULER_ANGLES) -> decompose(QUATERNION), allocationless.
+	**/
+	public static function quaternionFromEuler(rot:Vector3D, ?output:Vector3D):Vector3D {
+		if(output == null) {
+			output = new Vector3D();
+			FoxRenderer.allocationsThisFrame += 1;
+		}
+		// Euler -> Matrix
+		var cx = Math.cos(rot.x);
+		var cy = Math.cos(rot.y);
+		var cz = Math.cos(rot.z);
+		var sx = Math.sin(rot.x);
+		var sy = Math.sin(rot.y);
+		var sz = Math.sin(rot.z);
+
+		var mr0 = cy * cz;
+		var mr1 = cy * sz;
+		var mr2 = -sy;
+		var mr4 = sx * sy * cz - cx * sz;
+		var mr5 = sx * sy * sz + cx * cz;
+		var mr6 = sx * cy;
+		var mr8 = cx * sy * cz + sx * sz;
+		var mr9 = cx * sy * sz - sx * cz;
+		var mr10 = cx * cy;
+
+		// Matrix -> Quaternion
+		var tr = mr0 + mr5 + mr10;
+
+		if (tr > 0)
+		{
+			output.w = Math.sqrt(1 + tr) / 2;
+
+			output.x = (mr6 - mr9) / (4 * output.w);
+			output.y = (mr8 - mr2) / (4 * output.w);
+			output.z = (mr1 - mr4) / (4 * output.w);
+		}
+		else if ((mr0 > mr5) && (mr0 > mr10))
+		{
+			output.x = Math.sqrt(1 + mr0 - mr5 - mr10) / 2;
+
+			output.w = (mr6 - mr9) / (4 * output.x);
+			output.y = (mr1 + mr4) / (4 * output.x);
+			output.z = (mr8 + mr2) / (4 * output.x);
+		}
+		else if (mr5 > mr10)
+		{
+			output.y = Math.sqrt(1 + mr5 - mr0 - mr10) / 2;
+
+			output.x = (mr1 + mr4) / (4 * output.y);
+			output.w = (mr8 - mr2) / (4 * output.y);
+			output.z = (mr6 + mr9) / (4 * output.y);
+		}
+		else
+		{
+			output.z = Math.sqrt(1 + mr10 - mr0 - mr5) / 2;
+
+			output.x = (mr8 + mr2) / (4 * output.z);
+			output.y = (mr6 + mr9) / (4 * output.z);
+			output.w = (mr1 - mr4) / (4 * output.z);
+		}
+		return output;
 	}
 
 	/**

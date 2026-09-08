@@ -1,17 +1,22 @@
 package foxlite.skin;
 
+import haxe.Json;
+import haxe.io.Bytes;
+import foxlite.animation.FoxAnimationTrack;
+import foxlite.animation.FoxTrackType;
 import foxlite.renderer.FoxRenderer;
 import foxlite.loaders.FoxJSONLoader;
 import foxlite.texture.FoxTextureBuffer;
 import foxlite.FoxObject;
+import foxlite.math.FoxMathUtil;
 import foxlite.polyfill.TypedArray;
 import foxlite.polyfill.VectorFactory;
 import foxlite.skin.FoxBone;
-import haxe.Json;
-import haxe.io.Bytes;
 import lime.utils.Float32Array;
 import openfl.geom.Matrix3D;
+import openfl.geom.Vector3D;
 import openfl.utils.Assets;
+import foxlite.animation.FoxAnimation;
 
 class FoxSkinData {
 
@@ -106,6 +111,28 @@ class FoxSkinData {
 			data.addBone(newBone, bone.parentIndex);
 		}
 		return data;
+	}
+
+	/**
+		Creates tracks for each bone using their **current transform** and returns a `FoxAnimation`,
+		this is the base pose for the whole armature.
+
+		This is needed for additive animation layering if the model hasn't been exported with one.
+	**/
+	public function createRestAnimation():FoxAnimation {
+		var anim = new FoxAnimation("REST", 0.001);
+		for(bone in bones) {
+			var pos:FoxAnimationTrack<Vector3D> = anim.addTrack('${bone.name}:position', FoxTrackType.VECTOR3D);
+			var rot:FoxAnimationTrack<Vector3D> = anim.addTrack('${bone.name}:quaternion', FoxTrackType.QUATERNION);
+			var sca:FoxAnimationTrack<Vector3D> = anim.addTrack('${bone.name}:scale', FoxTrackType.VECTOR3D);
+
+			var quaternion = FoxMathUtil.quaternionFromEuler(bone.rotation);
+
+			pos.addFrame(0, bone.position);
+			rot.addFrame(0, quaternion);
+			sca.addFrame(0, bone.scale);
+		}
+		return anim;
 	}
 
 	public inline static function fromJSON(name:String):FoxSkinData {
