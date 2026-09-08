@@ -80,7 +80,7 @@ class FoxMathUtil {
 		fov = 1 / Math.tan((fov * 0.5) * degToRad);
 		
 		mp.copyRawDataFrom(MATRIX_IDENTITY); // identity()
-		final a = mp.rawData.__array;
+		var a = mp.rawData.__array;
 		a[0] = fov / aspect;
 		a[5] = fov;
 		a[10] = -(-near - far) / ZRANG;
@@ -94,7 +94,7 @@ class FoxMathUtil {
 
 	public static function perspectiveMatrixClipFast(mp:Matrix3D, near:Float, far:Float):Matrix3D {
 		var ZRANG = near - far;
-		final a = mp.rawData.__array;
+		var a = mp.rawData.__array;
 		a[10] = -(-near - far) / ZRANG;
 		a[14] = 2.0 * far * near / ZRANG;
 		return mp;
@@ -113,7 +113,7 @@ class FoxMathUtil {
 
 		mo.copyRawDataFrom(MATRIX_IDENTITY); // identity()
 		
-		final a = mo.rawData.__array;
+		var a = mo.rawData.__array;
 		a[0] = 2.0 / (right - left);
 		a[3] = -((right + left) / (right - left));
 		a[5] = 2.0 / (top - bottom);
@@ -232,7 +232,7 @@ class FoxMathUtil {
 	**/
 	// Adapted from https://github.com/mrdoob/three.js/blob/dev/src/math/Euler.js
 	public static function eulerFromMatrix(m:Matrix3D, ?output:Vector3D, ?scale:Vector3D) {
-		final mt = m.rawData.__array;
+		var mt = m.rawData.__array;
 		var e = output ?? new Vector3D();
 
 		if(scale == null) {
@@ -374,7 +374,7 @@ class FoxMathUtil {
 		Make sure to apply this first before extracting euler angles too if needed.
 	**/
 	public static function scaleFromMatrix(m:Matrix3D, ?output:Vector3D) {
-		final mr = m.rawData.__array;
+		var mr = m.rawData.__array;
 		var scale = output ?? new Vector3D();
 
 		scale.x = Math.sqrt(mr[0] * mr[0] + mr[1] * mr[1] + mr[2] * mr[2]);
@@ -424,14 +424,14 @@ class FoxMathUtil {
 
 	public static function directionOf(matrix:Matrix3D):Vector3D {
 		FoxRenderer.allocationsThisFrame += 1;
-		final a = matrix.rawData.__array;
+		var a = matrix.rawData.__array;
 		var v = new Vector3D(a[8], a[9], a[10]);
 		v.normalize();
 		return v;
 	}
 
 	public static function directionOfToOutput(matrix:Matrix3D, output:Vector3D):Vector3D {
-		final a = matrix.rawData.__array;
+		var a = matrix.rawData.__array;
 		output.setTo(a[8], a[9], a[10]);
 		output.normalize();
 		return output;
