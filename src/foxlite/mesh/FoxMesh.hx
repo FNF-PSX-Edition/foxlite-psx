@@ -405,6 +405,9 @@ class FoxMesh {
 		var point:Vector3D = FoxMathUtil.__tempVector;
 		var min:Vector3D = FoxMathUtil.__tempVector2;
 		var max:Vector3D = FoxMathUtil.__tempVector3;
+		
+		min.setTo(1e7, 1e7, 1e7);
+		max.setTo(-1e7, -1e7, -1e7);
 
 		var isArray:Bool = Std.isOfType(vertices, Array);
 		var i:Int = 0;
