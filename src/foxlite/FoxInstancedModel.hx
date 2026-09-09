@@ -218,7 +218,7 @@ class FoxInstancedModel extends FoxModel {
 	}
 
 	public override function destroy() {
-		instanceData.destroy();
+		instanceData?.destroy();
 		super.destroy();
 	}
 }

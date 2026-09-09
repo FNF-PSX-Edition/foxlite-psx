@@ -81,10 +81,10 @@ class FoxAnimationPlayer extends FoxAnimationLinker {
 
 		@param library Either a single `FoxAnimation` or a `StringMap` containing multiple `FoxAnimation` for the player's library
 	**/
-	public function new(?library:Dynamic) {
+	public function new(?library:Any) {
 		super();
 		if(Std.isOfType(library, FoxAnimation)) addAnimation(library);
-		else if(library != null) for(anim in (library:Map<String, FoxAnimation>)) addAnimation(anim);
+		else if(Std.isOfType(library, StringMap)) for(anim in (library:StringMap<FoxAnimation>)) addAnimation(anim);
 		name = "FoxAnimationPlayer";
 	}
 
