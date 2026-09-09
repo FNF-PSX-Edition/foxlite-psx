@@ -182,6 +182,7 @@ class FoxRenderer {
 
 		// Initialize missing texture
 		MISSING_TEXTURE = FoxTexture.create(2, 2, "rgba", "UNSIGNED_SHORT_4_4_4_4");
+		MISSING_TEXTURE.assetsKey = "Missing texture";
 		MISSING_TEXTURE.filter = FoxTextureFilter.NEAREST;
 		MISSING_TEXTURE.wrapMode = FoxWrapMode.REPEAT;
 
@@ -405,19 +406,12 @@ class FoxRenderer {
 		var glTexture = texture.glTexture;
 		
 		GL.activeTexture(gl.TEXTURE0 + sampler);
-
-		if(glTexture.__textureTarget == gl.TEXTURE_2D) {
-			context.__bindGLTexture2D(glTexture.__textureID);
-		}
-		else if(glTexture.__textureTarget == gl.TEXTURE_CUBE_MAP) {
-			context.__bindGLTextureCubeMap(glTexture.__textureID);
-		}
+		GL.bindTexture(glTexture.__textureTarget, glTexture.__textureID);
 
 		if(texture.__paramsNeedUpdate) {
 			FoxRenderer.setTextureParameters(texture);
 			texture.__paramsNeedUpdate = false;
 		}
-		
 	}
 
 	public static function activeTextures(context:Context3D, textureInput:Map<String, foxlite.FoxShader.FoxShaderTextureInput>):Int {
@@ -526,7 +520,7 @@ class FoxRenderer {
 			gl.texParameterf(target, extensions.anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, aniso);
 		}
 
-		// gl.generateMipmap(target); Generate mipmaps on your own at texture loading
+		if(texture.mipFilter != FoxMipFilter.MIPNONE) gl.generateMipmap(target);
 	}
 
 	/**
