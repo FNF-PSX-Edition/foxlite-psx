@@ -212,7 +212,14 @@ class FoxFlxSprite extends FoxModel {
 
 	// From Flixel and Codename Engine
 	function calculateOffsetMatrix() {
-		sprite.frame.prepareMatrix(_matrix, 0, sprite.flipX, sprite.flipY);
+		var angle = sprite.frame.angle;
+		sprite.frame.prepareMatrix(_matrix, angle, sprite.flipX, sprite.flipY);
+		if (angle == -90) {
+			final srcX = sprite.frame.sourceSize.x;
+			final srcY = sprite.frame.sourceSize.y;
+			var aspect = srcX / srcY;
+			_matrix.translate(-srcX/aspect, srcY*aspect);
+		}
 		_matrix.translate(-sprite.origin.x, -sprite.origin.y);
 		#if cne
 		_matrix.translate(-sprite.frameOffset.x, -sprite.frameOffset.y);
