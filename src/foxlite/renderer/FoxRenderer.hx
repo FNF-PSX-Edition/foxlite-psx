@@ -20,6 +20,7 @@ import foxlite.texture.FoxFramebuffer;
 import foxlite.texture.FoxFramebufferCubemap;
 import foxlite.texture.FoxTexture;
 import foxlite.texture.FoxTextureFilter;
+import foxlite.texture.FoxMipFilter;
 import foxlite.texture.FoxWrapMode;
 import foxlite.polyfill.TypedArray;
 
@@ -36,6 +37,14 @@ import flixel.FlxG;
 #if foxlite_polymod
 import lime.utils.DataPointer;
 #end
+
+typedef FoxGLExtensions = {
+	?anisotropic:Dynamic,
+	?drawBuffersEXT:Dynamic, // WebGL 1
+	?depthTexture:Dynamic,
+	?textureFloat:Dynamic,
+	?textureHalfFloat:Dynamic
+};
 
 // TODO: Make this a singleton so we don't use this many static vars
 class FoxRenderer {
@@ -66,6 +75,8 @@ class FoxRenderer {
 	public static var __indexBuffer:Dynamic = null;
 
 	public static var renderMode:Int = GL.TRIANGLES;
+	public static var maxAnisotropy:Int = 0;
+	public static var extensions:FoxGLExtensions = {};
 
 	/**
 		If true, all scenes __must__ rebuild their draw groups.
@@ -136,7 +147,7 @@ class FoxRenderer {
 		trace(BUILD_NAME, VERSION, renderContext, frameCount, drawCalls, verticesDrawn, stateSwitches, __blendMode, 
 			__depthTest, __shader, __stencilTest, renderMode, debugWireframe, mustRebuildDrawGroups, 
 			renderedInstances, onPreDraw, onPostDraw, __indexBuffer, __scissorTest, glDeviceName, MISSING_TEXTURE, 
-			MISSING_MATERIAL, MISSING_SHADER, initialized, __target, calculateMotionVectors
+			MISSING_MATERIAL, MISSING_SHADER, initialized, __target, calculateMotionVectors, extensions, maxAnisotropy
 		);
 		#end
 		
@@ -145,17 +156,29 @@ class FoxRenderer {
 		trace('[FoxLite > FoxRenderer]: lime is ${renderContext}:\n    - Shader model: ${GL.getParameter(context.gl.SHADING_LANGUAGE_VERSION)}\n    - Device: $glDeviceName');
 	
 		// Activate extensions
-		var ext;
-		ext = GL.getExtension("ARB_draw_buffers")
-		??	  GL.getExtension("EXT_draw_buffers")
-		?? 	  GL.getExtension("WEBGL_draw_buffers")
-		?? 	  GL.getExtension("WEBGL_depth_texture"); // Allow the use of gl.DEPTH_STENCIL_ATTACHMENT
+		extensions.drawBuffersEXT = GL.getExtension("ARB_draw_buffers")
+								 ?? GL.getExtension("EXT_draw_buffers")
+								 ?? GL.getExtension("WEBGL_draw_buffers");
 
-		ext = GL.getExtension("EXT_texture_filter_anisotropic")
-  		??	  GL.getExtension("MOZ_EXT_texture_filter_anisotropic")
-  		??	  GL.getExtension("WEBKIT_EXT_texture_filter_anisotropic");
+		extensions.depthTexture = GL.getExtension("WEBGL_depth_texture"); // Allow the use of gl.DEPTH_STENCIL_ATTACHMENT
 
-		trace('[FoxLite > FoxRenderer]: Texture Anisotropy ${ext == null ?  "not" : "is"} supported.');
+		extensions.anisotropic = GL.getExtension("EXT_texture_filter_anisotropic")
+  							  ?? GL.getExtension("MOZ_EXT_texture_filter_anisotropic")
+  							  ?? GL.getExtension("WEBKIT_EXT_texture_filter_anisotropic");
+
+		if(extensions.anisotropic != null) {
+			maxAnisotropy = GL.getParameter(extensions.anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+		}
+
+		// Those don't really return anything but we keep them in the object for tracking our extensions
+		extensions.textureFloat = GL.getExtension("OES_texture_float")
+							   ?? GL.getExtension("ARB_texture_float");
+
+		extensions.textureHalfFloat = GL.getExtension("OES_texture_half_float")
+								   ?? GL.getExtension("ARB_half_float_pixel")
+								   ?? GL.getExtension("ARB_half_float_vertex");
+
+		trace('[FoxLite > FoxRenderer]: Texture Anisotropy ${extensions.anisotropic == null ?  "not" : "is"} supported.');
 
 		// Initialize missing texture
 		MISSING_TEXTURE = FoxTexture.create(2, 2, "rgba", "UNSIGNED_SHORT_4_4_4_4");
@@ -391,9 +414,7 @@ class FoxRenderer {
 		}
 
 		if(texture.__paramsNeedUpdate) {
-			context.setTextureAt(sampler, glTexture);
-			context.setSamplerStateAt(sampler, cast texture.wrapMode, cast texture.filter, cast texture.mipFilter);
-			glTexture.__setSamplerState(context.__state.samplerStates[sampler]);
+			FoxRenderer.setTextureParameters(texture);
 			texture.__paramsNeedUpdate = false;
 		}
 		
@@ -408,14 +429,104 @@ class FoxRenderer {
 			// Missing texture check
 			if(tex?.glTexture == null) tex = FoxRenderer.MISSING_TEXTURE;
 
-			//context.setTextureAt(sampler, tex.glTexture);
-			//context.setSamplerStateAt(sampler, cast tex.wrapMode, cast tex.filter, cast tex.mipFilter);
 			useTexture(sampler, tex);
 			GL.uniform1i(cast t.location, sampler);
 			sampler += 1;
 		}
 		FoxRenderer.stateSwitches += sampler;
 		return sampler;
+	}
+
+	/**
+		Sets the bound texture parameters, this also sets anisotropy if specified.
+
+		__Note:__ This will not generate mipmaps on its own, instead call `texture.generateMipmaps()` if
+		you are going to use mipmap filtering
+	**/
+	// from OpenFL, but better.
+	public static function setTextureParameters(texture:FoxTexture) {
+		var gl = context.gl;
+		var target = texture.glTexture.__textureTarget;
+		var wrapModeS = 0, wrapModeT = 0;
+
+		switch(texture.wrapMode) {
+			case FoxWrapMode.CLAMP: {
+				wrapModeS = gl.CLAMP_TO_EDGE;
+				wrapModeT = gl.CLAMP_TO_EDGE;
+			};
+			case FoxWrapMode.CLAMP_U_REPEAT_V: {
+				wrapModeS = gl.CLAMP_TO_EDGE;
+				wrapModeT = gl.REPEAT;
+			};
+			case FoxWrapMode.REPEAT: {
+				wrapModeS = gl.REPEAT;
+				wrapModeT = gl.REPEAT;
+			};
+			case FoxWrapMode.REPEAT_U_CLAMP_V: {
+				wrapModeS = gl.REPEAT;
+				wrapModeT = gl.CLAMP_TO_EDGE;
+			};
+			case FoxWrapMode.MIRROR: {
+				wrapModeS = 0x8370; // GL_MIRRORED_REPEAT
+				wrapModeT = 0x8370; // GL_MIRRORED_REPEAT
+			};
+			case FoxWrapMode.MIRROR_U_CLAMP_V: {
+				wrapModeS = 0x8370; // GL_MIRRORED_REPEAT
+				wrapModeT = gl.CLAMP_TO_EDGE;
+			};
+			case FoxWrapMode.CLAMP_U_MIRROR_V: {
+				wrapModeS = gl.CLAMP_TO_EDGE;
+				wrapModeT = 0x8370; // GL_MIRRORED_REPEAT
+			};
+			case FoxWrapMode.MIRROR_U_REPEAT_V: {
+				wrapModeS = 0x8370; // GL_MIRRORED_REPEAT
+				wrapModeT = gl.REPEAT;
+			};
+			case FoxWrapMode.REPEAT_U_MIRROR_V: {
+				wrapModeS = gl.REPEAT;
+				wrapModeT = 0x8370; // GL_MIRRORED_REPEAT
+			};
+			default: throw "wrap bad enum";
+		}
+
+		var magFilter = 0, minFilter = 0;
+
+		switch(texture.filter) {
+			case FoxTextureFilter.NEAREST:
+				magFilter = gl.NEAREST;
+			default:
+				magFilter = gl.LINEAR;
+		}
+
+		switch(texture.mipFilter) {
+			case FoxMipFilter.MIPLINEAR:
+				minFilter = texture.filter == FoxTextureFilter.NEAREST ? gl.NEAREST_MIPMAP_LINEAR : gl.LINEAR_MIPMAP_LINEAR;
+			case FoxMipFilter.MIPNEAREST:
+				minFilter = texture.filter == FoxTextureFilter.NEAREST ? gl.NEAREST_MIPMAP_NEAREST : gl.LINEAR_MIPMAP_NEAREST;
+			case FoxMipFilter.MIPNONE:
+				minFilter = texture.filter == FoxTextureFilter.NEAREST ? gl.NEAREST : gl.LINEAR;
+			default:
+				throw "mipfiter bad enum";
+		}
+
+		gl.texParameteri(target, gl.TEXTURE_MIN_FILTER, minFilter);
+		gl.texParameteri(target, gl.TEXTURE_MAG_FILTER, magFilter);
+		gl.texParameteri(target, gl.TEXTURE_WRAP_S, wrapModeS);
+		gl.texParameteri(target, gl.TEXTURE_WRAP_T, wrapModeT);
+
+		var aniso:Float = switch(texture.filter) {
+			case FoxTextureFilter.ANISOTROPIC2X: 2;
+			case FoxTextureFilter.ANISOTROPIC4X: 4;
+			case FoxTextureFilter.ANISOTROPIC8X: 8;
+			case FoxTextureFilter.ANISOTROPIC16X: 16;
+			default: 1;
+		}
+		if(extensions.anisotropic != null) {
+			if(aniso > maxAnisotropy) aniso = maxAnisotropy;
+			gl.texParameterf(target, extensions.anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, aniso);
+		}
+
+		// gl.generateMipmap(target); Generate mipmaps on your own at texture loading
 	}
 
 	/**
@@ -770,10 +881,6 @@ class FoxRenderer {
 
 		// Create texture with our format to be bound to a framebuffer
 
-		// Note: For gl.FLOAT formats in WebGL, OES_texture_float extensions MUST be enabled!!!
-		gl.getExtension("OES_texture_float");
-		gl.getExtension("OES_texture_half_float");
-
 		var data = FoxRenderer.getTextureFormat(format);
 		var type = Reflect.field(gl, type.toUpperCase());
 
@@ -803,9 +910,6 @@ class FoxRenderer {
 		// Now setup our texture
 		tex.__width = size;
 		tex.__height = size;
-
-		gl.getExtension("OES_texture_float");
-		gl.getExtension("OES_texture_half_float");
 
 		var data = FoxRenderer.getTextureFormat(format);
 		var type = Reflect.field(gl, type.toUpperCase());
