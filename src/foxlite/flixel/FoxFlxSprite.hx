@@ -17,6 +17,8 @@ package foxlite.flixel;
 
 import flixel.math.FlxRect;
 import flixel.FlxSprite;
+import flixel.math.FlxMatrix;
+
 import foxlite.FoxModel;
 import foxlite.material.FoxBlendMode;
 import foxlite.material.FoxMaterial;
@@ -34,6 +36,9 @@ class FoxFlxSprite extends FoxModel {
 
 	public var sprite:FlxSprite = null;
 	public var pixelSize:Float = 0.01; // Size of the pixels in the world
+
+	public var flipX:Bool = false;
+	public var flipY:Bool = false;
 	
 	/**
 		If enabled, the 3D sprite will adopt the color tint and color offsets
@@ -46,6 +51,11 @@ class FoxFlxSprite extends FoxModel {
 	var __prevRect:FlxRect;
 	var __prevBitmap:BitmapData = null;
 	var __recalculateBounds:Bool = true;
+
+	/**
+		A matrix that's used to store flixel frame offsets (if present)
+	**/
+	var _matrix:FlxMatrix;
 
 	// Shortcuts
 	public var material(get, set):FoxMaterial;
@@ -119,10 +129,6 @@ class FoxFlxSprite extends FoxModel {
 			var width = sprite.pixels.width;
 			var height = sprite.pixels.height;
 			var frame = sprite.frame.frame;
-			var src = sprite.frame.sourceSize;
-			var offset = sprite.frame.offset;
-			var offsetX = offset.x;
-			var offsetY = offset.y;
 
 			var u = frame.x / width;
 			var v = frame.y / height;
@@ -130,33 +136,52 @@ class FoxFlxSprite extends FoxModel {
 			var vh = (frame.y + frame.height) / height;
 			__defaultUVs = false;
 
-			uvsRaw[0] = u;  uvsRaw[1] = v;
-			uvsRaw[2] = uw; uvsRaw[3] = v;
-			uvsRaw[4] = uw; uvsRaw[5] = vh;
-			uvsRaw[6] = u;  uvsRaw[7] = vh;
+			switch(sprite.frame.angle) {
+				case -90: { // ANGLE_NEG_90, ANGLE_270
+					uvsRaw[0] = u;  uvsRaw[1] = v;  // 0
+					uvsRaw[2] = u;  uvsRaw[3] = vh; // 3
+					uvsRaw[4] = uw; uvsRaw[5] = vh; // 2
+					uvsRaw[6] = uw; uvsRaw[7] = v;  // 1
+				};
+				default: { // ANGLE_0
+					uvsRaw[0] = u;  uvsRaw[1] = v;
+					uvsRaw[2] = uw; uvsRaw[3] = v;
+					uvsRaw[4] = uw; uvsRaw[5] = vh;
+					uvsRaw[6] = u;  uvsRaw[7] = vh;
+				};
+			}
+			
 			mesh.updateBufferRaw(FoxMeshBufferType.UVS, uvsRaw);
 			
-			#if cne
-			offsetX -= sprite.frameOffset.x * (sprite.flipX ? -1 : 1); // * (height / width);
-			offsetY -= sprite.frameOffset.y * (sprite.flipY ? -1 : 1) / (pixelSize * (frame.height / frame.width)); // ????
-			#end
-
 			final ps = pixelSize;
-			final srcX = src.x * ps;
-			final srcY = src.y * ps;
+			var sw = frame.width * ps;
+			var sh = frame.height * ps;
 
-			uw = frame.width * ps;
-			vh = frame.height * ps;
-			u = (offsetX * ps);
-			v = (offsetY *-ps * (vh / uw) * ps) - srcY;
+			calculateOffsetMatrix();
 
-			final sw = sprite.width * ps * 0.5;
-			final sh = sprite.height * ps * 0.5;
+			final ox =  _matrix.tx * pixelSize;
+			final oy = -_matrix.ty * pixelSize;
 
-			verticesRaw[0] =  0 + u - sw; verticesRaw[1]  =  vh + v + sh; //verticesRaw[2] = 0;
-			verticesRaw[3] = uw + u - sw; verticesRaw[4]  =  vh + v + sh; //verticesRaw[5] = 0;
-			verticesRaw[6] = uw + u - sw; verticesRaw[7]  =   0 + v + sh; //verticesRaw[8] = 0;
-			verticesRaw[9] =  0 + u - sw; verticesRaw[10] =   0 + v + sh; //verticesRaw[11] = 0;
+			// Flixel top-left corner offset
+			sw = ox + sw;
+
+			switch(sprite.frame.angle) {
+				case -90: { // ANGLE_NEG_90, ANGLE_270
+					sh = oy + sh;
+					verticesRaw[0] = oy; verticesRaw[1]  = ox; 
+					verticesRaw[3] = sh; verticesRaw[4]  = ox; 
+					verticesRaw[6] = sh; verticesRaw[7]  = sw; 
+					verticesRaw[9] = oy; verticesRaw[10] = sw;
+				};
+				default: { // ANGLE_0
+					sh = oy - sh;
+					verticesRaw[0] = ox; verticesRaw[1]  = oy; 
+					verticesRaw[3] = sw; verticesRaw[4]  = oy; 
+					verticesRaw[6] = sw; verticesRaw[7]  = sh; 
+					verticesRaw[9] = ox; verticesRaw[10] = sh; 
+				}
+			}
+			
 			mesh.updateBufferRaw(FoxMeshBufferType.VERTICES, verticesRaw);
 		}
 		if(__recalculateBounds) {
@@ -176,12 +201,22 @@ class FoxFlxSprite extends FoxModel {
 		else { // UV Animated sprite
 			var r = sprite.frame.frame;
 			if(__prevFrame != sprite.frame.name || (r != null && __prevRect != null && !r.equals(__prevRect))) {
+				if(_matrix == null) _matrix = new FlxMatrix();
 				calculateMesh();
 				__prevFrame = sprite.frame.name;
 				__prevRect = r;
 			}
 		}
 		checkBitmap();
+	}
+
+	// From Flixel and Codename Engine
+	function calculateOffsetMatrix() {
+		sprite.frame.prepareMatrix(_matrix, 0, sprite.flipX, sprite.flipY);
+		_matrix.translate(-sprite.origin.x, -sprite.origin.y);
+		#if cne
+		_matrix.translate(-sprite.frameOffset.x, -sprite.frameOffset.y);
+		#end
 	}
 
 	public function checkBitmap() {
