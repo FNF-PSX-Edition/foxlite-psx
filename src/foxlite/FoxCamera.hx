@@ -88,6 +88,7 @@ class FoxCamera extends FoxObject {
 
 	public override function update(dt:Float) {
 		super.update(dt);
+		if(scene == null) return;
 		// Create from transform so other influences can affect the camera
 		if(FoxRenderer.calculateMotionVectors) __prevViewMatrix.copyRawDataFrom(viewMatrix.rawData);
 		FoxMathUtil.viewMatrixFromTransform(viewMatrix, transform);
