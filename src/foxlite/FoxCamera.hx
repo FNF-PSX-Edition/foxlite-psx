@@ -88,7 +88,6 @@ class FoxCamera extends FoxObject {
 
 	public override function update(dt:Float) {
 		super.update(dt);
-		if(scene == null) return;
 		// Create from transform so other influences can affect the camera
 		if(FoxRenderer.calculateMotionVectors) __prevViewMatrix.copyRawDataFrom(viewMatrix.rawData);
 		FoxMathUtil.viewMatrixFromTransform(viewMatrix, transform);
@@ -138,7 +137,7 @@ class FoxCamera extends FoxObject {
 			}
 
 			// Do shadow pass for all shadow lights
-			pass.passShadowLights(lightData, this, drawGroups);
+			if(lightData != null) pass.passShadowLights(lightData, this, drawGroups);
 			
 			// Do normal render pass
 			pass.pass(this, drawGroups, framebuffer);
@@ -148,7 +147,7 @@ class FoxCamera extends FoxObject {
 	public override function destroy() {
 		transform = null;
 		projectionMatrix = null;
-		lightData.destroy();
+		lightData?.destroy();
 		super.destroy();
 	}
 

@@ -32,7 +32,7 @@ class FoxDirectionalLight extends FoxBaseLight {
 
 	public override function draw(camera:FoxCamera) {
 		super.draw(camera);
-		setToLightData(camera);
+		if(camera.lightData != null) setToLightData(camera);
 	}
 
 	public override function setToLightData(camera:FoxCamera) {

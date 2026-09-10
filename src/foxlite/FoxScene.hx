@@ -168,12 +168,12 @@ class FoxScene extends FoxExtendableSprite {
 
 		for(cam in foxCameras) {
 			if(!cam.visible) continue;
-			cam.lightData.clearLights();
+			cam.lightData?.clearLights();
 			cam.scene = this;
 			// Draw call for our members before actual rendering
 			for(m in foxGroup.members) if(m.visible) m.draw(cam);
 
-			cam.lightData.prepareLights(cam);
+			cam.lightData?.prepareLights(cam);
 			cam.render(drawGroups);
 		}
 
