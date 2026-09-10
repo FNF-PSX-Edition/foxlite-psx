@@ -122,6 +122,10 @@ class FoxTextureBuffer extends FoxTexture {
 
 		glTexture = FoxRenderer.createTextureStorage(length, 1, formatString, typeString);
 		pixelSize.x = 1.0 / length;
+
+		// Update texture state
+		__paramsNeedUpdate = true;
+		FoxRenderer.useTexture(0, this);
 	}
 
 	/**

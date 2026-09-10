@@ -31,9 +31,6 @@ typedef FunkinSprite = Dynamic; // Keep haxe happy
 
 class FoxFunkinSprite extends FoxFlxSprite {
 
-	public var flipX:Bool = false;
-	public var flipY:Bool = false;
-
 	/**
 		If true, the mesh will be offset by the sprite's `_matrix`.
 		
@@ -43,7 +40,6 @@ class FoxFunkinSprite extends FoxFlxSprite {
 
 	var __prevGraphicWidth:Int = 0;
 	var __prevGraphicHeight:Int = 0;
-	var _matrix:FlxMatrix;
 
 	/**
 		Creates a 3D sprite from a `FlxAnimate` sprite, although it falls back to `FoxFlxSprite` if it's not detected.
