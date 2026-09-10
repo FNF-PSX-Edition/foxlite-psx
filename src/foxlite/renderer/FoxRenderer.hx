@@ -794,7 +794,11 @@ class FoxRenderer {
 		gl.enable(gl.BLEND);
 		gl.blendEquation(gl.FUNC_ADD);
 		
-		gl.blendFuncSeparate(context.__getGLBlend(cachedState.blendSourceRGBFactor), context.__getGLBlend(cachedState.blendDestinationAlphaFactor), gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+		gl.blendFuncSeparate(
+			context.__getGLBlend(cachedState.blendSourceRGBFactor), 
+			context.__getGLBlend(cachedState.blendDestinationAlphaFactor), 
+			context.__getGLBlend(cachedState.blendSourceAlphaFactor),
+			context.__getGLBlend(cachedState.blendDestinationAlphaFactor));
 	}
 
 	public static function setBlendMode(context:Context3D, blendMode:Int) {
