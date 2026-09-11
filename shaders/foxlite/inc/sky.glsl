@@ -1,4 +1,6 @@
-#define SKY_RADIANCE_LEVEL 6
+#ifndef SKY_RADIANCE_LEVEL
+#define SKY_RADIANCE_LEVEL 8
+#endif
 
 uniform vec2 skyOffset;
 uniform sampler2D skyTexture;
