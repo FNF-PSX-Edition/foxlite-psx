@@ -106,7 +106,7 @@ class FoxDirectionalSound extends FoxObject {
 		var distanceDelta:Float = (distance - prevDistance);
 		prevDistance = distance;
 
-		if(dopplerStrength != 0) sound.pitch = (dopplerPitchOffset + 1) - distanceDelta * (60/t) * dopplerStrength;
+		if(dopplerStrength != 0) sound.pitch = (dopplerPitchOffset + 1) - distanceDelta * (60/dt) * dopplerStrength;
 
 		// Dynamic sound propagation
 		if(playDistance != 0) {
