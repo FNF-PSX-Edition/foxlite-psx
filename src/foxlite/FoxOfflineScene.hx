@@ -10,26 +10,36 @@ import foxlite.group.FoxGroup;
 **/
 class FoxOfflineScene extends FoxExtendableBasic {
 
-	public var members:FoxGroup = new FoxGroup();
+	public var foxGroup:FoxGroup = new FoxGroup();
+
+	/**
+		An array of `FoxCamera`.
+
+		They won't render anything in a `FoxOfflineScene`, but can still update their
+		projection and view matrices
+	**/
+	public var foxCameras:Array<FoxCamera> = [];
 
 	public override function update(elapsed:Float) {
-		members.update(elapsed);
+		for(cam in foxCameras) if(cam.active) cam.update(elapsed);
+		foxGroup.update(elapsed);
 	}
 
 	public inline function add(member:FoxBasic) {
-		members.add(member);
+		foxGroup.add(member);
 	}
 
 	public inline function insert(pos:Int, member:FoxBasic) {
-		members.insert(pos, member);
+		foxGroup.insert(pos, member);
 	}
 
 	public inline function remove(member:FoxBasic) {
-		members.remove(member);
+		foxGroup.remove(member);
 	}
 
 	public override function destroy() {
-		members.destroy();
+		foxGroup.destroy();
+		foxCameras = null;
 		super.destroy();
 	}
 }

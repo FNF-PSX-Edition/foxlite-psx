@@ -182,7 +182,7 @@ class FoxRenderPass {
 				setGlobals(mat, matShader, camera, framebuffer);
 
 				if(matShader.__hasLights) {
-					camera.lightData.updateShaderLights(matShader);
+					camera.lightData?.updateShaderLights(matShader);
 				}
 				var samplerId = FoxRenderer.useMaterial(context, mat);
 

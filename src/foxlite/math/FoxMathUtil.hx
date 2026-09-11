@@ -445,4 +445,11 @@ class FoxMathUtil {
 		mvp.append(projection);
 		return mvp;
 	}
+
+	public static function bakeMVPToOutput(model:Matrix3D, view:Matrix3D, projection:Matrix3D, output:Matrix3D):Matrix3D {
+		output.copyRawDataFrom(model.rawData);
+		output.append(view);
+		output.append(projection);
+		return output;
+	}
 }

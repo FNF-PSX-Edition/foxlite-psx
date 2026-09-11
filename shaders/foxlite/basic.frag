@@ -89,7 +89,8 @@ void main() {
 		//float fresnel = fresnelSchlick(clamp(costheta, 0.0, 1.0), 0.05);
 		vec4 skyColor = panoramaSky(skyTexture, dir, pow(8.0, roughness)-1.0);
 	#ifdef SKY_RADIANCE
-		albedo *= panoramaSky(skyTexture, dir, SKY_RADIANCE_LEVEL);
+		vec4 envColor = pow(panoramaSky(skyTexture, dir, SKY_RADIANCE_LEVEL), 1./vec4(4));	
+		albedo *= envColor;
 	#endif
 		albedo = mix(albedo, skyColor, clamp(metallic, 0.0, 1.0));
 	#else

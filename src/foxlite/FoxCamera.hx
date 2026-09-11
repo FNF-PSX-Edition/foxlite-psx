@@ -156,7 +156,7 @@ class FoxCamera extends FoxObject {
 			}
 
 			// Do shadow pass for all shadow lights
-			pass.passShadowLights(lightData, this, drawGroups);
+			if(lightData != null) pass.passShadowLights(lightData, this, drawGroups);
 			
 			// Do normal render pass
 			pass.pass(this, drawGroups, framebuffer);
@@ -167,7 +167,7 @@ class FoxCamera extends FoxObject {
 		transform = null;
 		projectionMatrix = null;
 		__invSkyViewMatrix = null;
-		lightData.destroy();
+		lightData?.destroy();
 		super.destroy();
 	}
 
