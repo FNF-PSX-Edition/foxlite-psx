@@ -1,5 +1,6 @@
 package foxlite;
 
+import flixel.math.FlxPoint;
 import flixel.util.FlxColor;
 import foxlite.FoxLayer;
 import foxlite.animation.FoxLerp;
@@ -168,19 +169,28 @@ class FoxCamera extends FoxObject {
 		return v;
 	}
 
-	public function toFlixelScreenPoint(point:Vector3D, screenWidth:Float, screenHeight:Float, ?output:Vector2):Vector2 {
+	public function toFlixelScreenPoint(point:Vector3D, screenWidth:Float, screenHeight:Float, ?output:FlxPoint):FlxPoint {
 		final HW = screenWidth*.5;
 		final HH = screenHeight*.5;
 
 		if(output == null) {
-			output = new Vector2();
+			output = FlxPoint.get(0, 0);
 			FoxRenderer.allocationsThisFrame += 1;
 		}
-		output.setTo(
+		output.set(
 			HW + point.x * HW,
 			screenHeight - (HH + point.y * HH)
 		);
 		return output;
+	}
+
+	/**
+		Shortcut method, calls `getScreenPoint()` and then `toFlixelScreenPoint()`
+
+		Also returns a `FlxPoint instead`
+	**/
+	public inline function getFlixelScreenPoint(position:Vector3D, screenWidth:Float, screenHeight:Float):FlxPoint {
+		return toFlixelScreenPoint(getScreenPoint(position), screenWidth, screenHeight);
 	}
 
 	/**
