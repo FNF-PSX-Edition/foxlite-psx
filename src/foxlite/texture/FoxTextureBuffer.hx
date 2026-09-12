@@ -56,9 +56,9 @@ class FoxTextureBuffer extends FoxTexture {
 	**/
 	public function new(length:Int, channels:Int=1) {
 		super();
-		create(length, channels);
 		filter = FoxTextureFilter.NEAREST;
 		wrapMode = FoxWrapMode.CLAMP;
+		create(length, channels);
 	}
 
 	/**

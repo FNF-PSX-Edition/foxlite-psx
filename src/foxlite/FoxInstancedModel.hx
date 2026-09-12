@@ -112,17 +112,17 @@ class FoxInstancedModel extends FoxModel {
 					var column2 = instanceData.column2;
 					var color = instanceData.color;
 
-					var offset = __instanceMinChunk*4;
+					var offset = __instanceMinChunk*16;
 					var i = __instanceMinChunk*16; // 4 components x 4 bytes
 
 					bytes.blit(0, column0.bytes, i, byteLength);
-					FoxRenderer.updateVertexBuffer(context, column0.glBuffer, buffer, offset);
+					column0.glBuffer.updateFromTypedArray(buffer, offset);
 					bytes.blit(0, column1.bytes, i, byteLength);
-					FoxRenderer.updateVertexBuffer(context, column1.glBuffer, buffer, offset);
+					column1.glBuffer.updateFromTypedArray(buffer, offset);
 					bytes.blit(0, column2.bytes, i, byteLength);
-					FoxRenderer.updateVertexBuffer(context, column2.glBuffer, buffer, offset);
+					column2.glBuffer.updateFromTypedArray(buffer, offset);
 					bytes.blit(0, color.bytes, i, byteLength);
-					FoxRenderer.updateVertexBuffer(context, color.glBuffer, buffer, offset);
+					color.glBuffer.updateFromTypedArray(buffer, offset);
 					
 					FoxRenderer.allocationsThisFrame += 2;
 					__instanceBufferDirty = false;

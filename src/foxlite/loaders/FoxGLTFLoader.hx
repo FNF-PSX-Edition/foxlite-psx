@@ -1,6 +1,5 @@
 package foxlite.loaders;
 
-import foxlite.animation.FoxAnimationPlayer;
 import StringTools;
 import haxe.Json;
 import haxe.io.Path;
@@ -13,6 +12,7 @@ import foxlite.animation.FoxAnimation;
 import foxlite.animation.FoxTrackType;
 import foxlite.animation.FoxAnimationTrack;
 import foxlite.animation.FoxEaseType;
+import foxlite.animation.FoxAnimationPlayer;
 import foxlite.culling.BoundingBox;
 import foxlite.group.FoxObjectGroup;
 import foxlite.material.FoxMaterial;
@@ -20,7 +20,9 @@ import foxlite.material.FoxTriangleFace;
 import foxlite.material.FoxBlendMode;
 import foxlite.math.FoxMathUtil;
 import foxlite.mesh.FoxMesh;
-import foxlite.mesh.FoxMeshBufferType;
+import foxlite.mesh.buffer.FoxVertexBufferType;
+import foxlite.mesh.buffer.FoxVertexBuffer;
+import foxlite.mesh.buffer.FoxIndexBuffer;
 import foxlite.polyfill.VectorFactory;
 import foxlite.renderer.FoxRenderer;
 import foxlite.skin.FoxSkinData;
@@ -52,7 +54,6 @@ import openfl.geom.Vector3D;
 import openfl.geom.Matrix3D;
 import openfl.utils.ByteArray;
 import openfl.display.BitmapData;
-import openfl.display3D.VertexBuffer3D;
 import openfl.display3D.IndexBuffer3D;
 import openfl.display3D.textures.Texture;
 
@@ -333,7 +334,6 @@ class FoxGLTFLoader {
 			materials = new StringMap();
 			for(idx=>mat in (gltfJson.materials:Array<Dynamic>)) {
 				if(!Std.isOfType(mat.name, String)) mat.name = 'Material.${StringTools.lpad(Std.string(idx), '0', 3)}';
-				mat.name = directory + mat.name;
 				var material:FoxMaterial = materials?.get(mat.name);
 
 				if(material != null) {
@@ -398,6 +398,9 @@ class FoxGLTFLoader {
 				// Extensions
 				var KHR_materials_specular:Dynamic = mat.extensions?.KHR_materials_specular;
 				var KHR_materials_emissive_strength:Dynamic = mat.extensions?.KHR_materials_emissive_strength;
+				var KHR_materials_unlit:Dynamic = mat.extensions?.KHR_materials_unlit;
+
+				if(KHR_materials_unlit != null) addFlag("UNSHADED");
 
 				if(KHR_materials_specular?.specularColorFactor != null) {
 					var spec = KHR_materials_specular.specularColorFactor;
@@ -446,7 +449,7 @@ class FoxGLTFLoader {
 						}
 
 						var count:Int = accessor.count;
-						var data32PerVertex:Int = switch(accessor.type:String) {
+						var dataPerVertex:Int = switch(accessor.type:String) {
 							case "SCALAR": 1;
 							case "VEC2": 2;
 							case "VEC3": 3;
@@ -455,7 +458,19 @@ class FoxGLTFLoader {
 							case "MAT4": 16;
 							default: 1;
 						};
-						count *= data32PerVertex;
+						count *= dataPerVertex;
+
+						var bufferType:Null<Int> = switch(attrib) {
+							case "POSITION": FoxVertexBufferType.VERTICES;
+							case "NORMAL": FoxVertexBufferType.NORMALS;
+							case "TANGENT": FoxVertexBufferType.TANGENTS;
+							case "TEXCOORD_0": FoxVertexBufferType.UVS;
+							case "JOINTS_0": FoxVertexBufferType.BONE_INDICES;
+							case "WEIGHTS_0": FoxVertexBufferType.WEIGHTS;
+							case "COLOR_0": FoxVertexBufferType.COLORS;
+							case "INDICES": FoxVertexBufferType.INDICES;
+							default: continue;
+						}
 
 						var dataArray:ArrayBufferView = switch(accessor.componentType:Int) {
 							case AccessorComponentType.BYTE: new Int8Array(count);
@@ -488,44 +503,20 @@ class FoxGLTFLoader {
 							trace('Sparse not implemented yet.');
 						}
 						
-						var gpuBuffer:Any = null;
-						
-						switch(view.target:Int) {
-							case BufferViewTarget.ARRAY_BUFFER: {
-								gpuBuffer = mesh.context.createVertexBuffer(accessor.count, data32PerVertex);
-								(gpuBuffer:VertexBuffer3D).uploadFromTypedArray(dataArray);
-							};
-							case BufferViewTarget.ELEMENT_ARRAY_BUFFER: {
-								gpuBuffer = mesh.context.createIndexBuffer(accessor.count);
-								(gpuBuffer:IndexBuffer3D).uploadFromTypedArray(dataArray);
-							};
-						}
-						
-						switch(attrib) {
-							case "POSITION": {
-								// Add precalculated bounds aswell
-								if(mesh.bounds == null) {
-									var min:Array<Float> = accessor.min;
-									var max:Array<Float> = accessor.max;
-									mesh.bounds = new BoundingBox();
-									mesh.bounds.fromExtents(
-										new Vector3D(min[0], min[1], min[2]),
-										new Vector3D(max[0], max[1], max[2])
-									);
-								}
-								mesh.vertexBuffer = gpuBuffer;
-							}
-							case "NORMAL": mesh.normalBuffer = gpuBuffer;
-							case "TANGENT": mesh.tangentBuffer = gpuBuffer;
-							case "TEXCOORD_0": mesh.uvBuffer = gpuBuffer;
-							case "JOINTS_0": {
-								mesh.boneIndices = gpuBuffer;
-								mesh.boneIndices.__stride = stride * 4; // Fix OpenFL stride bugs
-							}
-							case "WEIGHTS_0": mesh.boneWeights = gpuBuffer;
-							case "COLOR_0": mesh.colorBuffer = gpuBuffer;
-							case "INDICES": mesh.indexBuffer = gpuBuffer;
-							default: (gpuBuffer:Dynamic)?.dispose(); // In case we have an invalid attribute
+						var gpuBuffer:FoxVertexBuffer = attrib == "INDICES" ? new FoxIndexBuffer(accessor.count, dataPerVertex) : new FoxVertexBuffer(accessor.count, dataPerVertex);
+						gpuBuffer.uploadFromTypedArray(dataArray);
+						if(accessor.normalized == true) gpuBuffer.normalized = true;
+						mesh.buffers[bufferType] = gpuBuffer;
+
+						if(mesh.bounds == null && attrib == "POSITION") {
+							// Add precalculated bounds aswell
+							var min:Array<Float> = accessor.min;
+							var max:Array<Float> = accessor.max;
+							mesh.bounds = new BoundingBox();
+							mesh.bounds.fromExtents(
+								new Vector3D(min[0], min[1], min[2]),
+								new Vector3D(max[0], max[1], max[2])
+							);
 						}
 					}
 					if(skip) break;
@@ -643,46 +634,61 @@ class FoxGLTFLoader {
 						case "MAT4": FoxTrackType.MATRIX4;
 						default: continue;
 					};
+
+					var stride:Int = switch(accessorOut.componentType:Int) {
+						case AccessorComponentType.SHORT,
+							 AccessorComponentType.UNSIGNED_SHORT: 2;
+						case AccessorComponentType.UNSIGNED_INT,
+							 AccessorComponentType.FLOAT: 4;
+						default: 1;
+					}
+
+					function readValueNorm(pos:Int):Float {
+						bufferOut.position = viewOut.byteOffset + pos*stride;
+						return switch(accessorOut.componentType:Int) {
+							case AccessorComponentType.BYTE: Math.max(bufferOut.readByte() / 127, -1);
+							case AccessorComponentType.UNSIGNED_BYTE: bufferOut.readUnsignedByte() / 255;
+							case AccessorComponentType.SHORT: Math.max(bufferOut.readShort() / 32767, -1);
+							case AccessorComponentType.UNSIGNED_SHORT: bufferOut.readUnsignedShort() / 65535;
+							default: bufferOut.readFloat();
+						}
+					}
 					
 					path = StringTools.replace(path, "translation", "position");
 					path = StringTools.replace(path, "rotation", "quaternion"); // We'll be using quat interpolation
 					var track:FoxAnimationTrack<Any> = animation.addTrack('${node.name}:$path', trackType);
+					var outPos:Int = 0;
 					for(i in 0...accessorIn.count) {
 						bufferIn.position = viewIn.byteOffset + i*4;
 						var time:Float = bufferIn.readFloat();
 						switch(trackType) {
 							case FoxTrackType.FLOAT: {
-								bufferOut.position = viewOut.byteOffset + i*4;
-								track.addFrame(time, bufferOut.readFloat(), interpolation);
+								track.addFrame(time, readValueNorm(outPos++), interpolation);
 							};
 							case FoxTrackType.VECTOR2: {
-								bufferOut.position = viewOut.byteOffset + i*8;
-								var x = bufferOut.readFloat();
-								var y = bufferOut.readFloat();
+								var x = readValueNorm(outPos++);
+								var y = readValueNorm(outPos++);
 								track.addFrame(time, new Vector2(x, y), interpolation);
 							};
 							case FoxTrackType.VECTOR3D: {
-								bufferOut.position = viewOut.byteOffset + i*12;
-								var x = bufferOut.readFloat();
-								var y = bufferOut.readFloat();
-								var z = bufferOut.readFloat();
+								var x = readValueNorm(outPos++);
+								var y = readValueNorm(outPos++);
+								var z = readValueNorm(outPos++);
 								track.addFrame(time, new Vector3D(x, y, z), interpolation);
 							};
 							case FoxTrackType.VECTOR4, FoxTrackType.QUATERNION: {
-								bufferOut.position = viewOut.byteOffset + i*16;
 								var v = new Vector3D(
-									bufferOut.readFloat(),
-									bufferOut.readFloat(),
-									bufferOut.readFloat(),
-									bufferOut.readFloat()
+									readValueNorm(outPos++),
+									readValueNorm(outPos++),
+									readValueNorm(outPos++),
+									readValueNorm(outPos++)
 								);
 								track.addFrame(time, v, interpolation);
 							};
 							case FoxTrackType.MATRIX4: {
-								bufferOut.position = viewOut.byteOffset + i*64;
 								var matrix = new Matrix3D();
 								var a = matrix.rawData.__array;
-								for(i in 0...16) a[i] = bufferOut.readFloat();
+								for(i in 0...16) a[i] = readValueNorm(outPos++);
 								track.addFrame(time, matrix, interpolation);
 							};
 						}

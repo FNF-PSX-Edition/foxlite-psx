@@ -143,25 +143,25 @@ class FoxInstanceData {
 	}
 
 	public function flushAll() {
-		FoxRenderer.updateVertexBuffer(context, column0.glBuffer, column0.buffer);
-		FoxRenderer.updateVertexBuffer(context, column1.glBuffer, column1.buffer);
-		FoxRenderer.updateVertexBuffer(context, column2.glBuffer, column2.buffer);
-		FoxRenderer.updateVertexBuffer(context, color.glBuffer, color.buffer);
+		column0.glBuffer.updateFromTypedArray(column0.buffer);
+		column1.glBuffer.updateFromTypedArray(column1.buffer);
+		column2.glBuffer.updateFromTypedArray(column2.buffer);
+		color.glBuffer.updateFromTypedArray(color.buffer);
 	}
 
 	public function flushInstance(instance:Int) {
 		// Blit instance data bytes to temp
 		// Then upload them
-		var offset:Int = instance * 4;
+		var offset:Int = instance * 16;
 		var i:Int = instance * 16; // 4 components x 4 bytes
 		_bytes.blit(0, column0.bytes, i, 16);
-		FoxRenderer.updateVertexBuffer(context, column0.glBuffer, __tmpBuffer, offset);
+		column0.glBuffer.updateFromTypedArray(__tmpBuffer, offset);
 		_bytes.blit(0, column1.bytes, i, 16);
-		FoxRenderer.updateVertexBuffer(context, column1.glBuffer, __tmpBuffer, offset);
+		column1.glBuffer.updateFromTypedArray(__tmpBuffer, offset);
 		_bytes.blit(0, column2.bytes, i, 16);
-		FoxRenderer.updateVertexBuffer(context, column2.glBuffer, __tmpBuffer, offset);
+		column2.glBuffer.updateFromTypedArray(__tmpBuffer, offset);
 		_bytes.blit(0, color.bytes, i, 16);
-		FoxRenderer.updateVertexBuffer(context, color.glBuffer, __tmpBuffer, offset);
+		color.glBuffer.updateFromTypedArray(__tmpBuffer, offset);
 	}
 
 	public function destroy() {

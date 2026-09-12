@@ -1,17 +1,19 @@
 package foxlite.mesh;
 
+
 import foxlite.math.FoxMathUtil;
 import flixel.math.FlxMath;
 import foxlite.culling.BoundingBox;
 import foxlite.material.FoxMaterial;
-import foxlite.mesh.FoxMeshBufferType;
+import foxlite.mesh.buffer.FoxVertexBuffer;
+import foxlite.mesh.buffer.FoxIndexBuffer;
+import foxlite.mesh.buffer.FoxVertexBufferType;
 import foxlite.polyfill.TypedArray;
 import foxlite.renderer.FoxRenderer;
 import lime.math.Vector2;
 import lime.utils.ArrayBufferView;
 import openfl.display3D.Context3D;
 import openfl.display3D.IndexBuffer3D;
-import openfl.display3D.VertexBuffer3D;
 import openfl.geom.Vector3D;
 #if foxlite_polymod
 import lime.graphics.opengl.GL;
@@ -22,35 +24,29 @@ import lime.utils.UInt16Array;
 
 class FoxMesh {
 
-	// GL Data
-	public var vertexBuffer:VertexBuffer3D = null;
-	public var uvBuffer:VertexBuffer3D = null;
-	public var indexBuffer:IndexBuffer3D = null;
-	public var normalBuffer:VertexBuffer3D = null;
-	public var tangentBuffer:VertexBuffer3D = null;
-	public var colorBuffer:VertexBuffer3D = null;
-	// For skin
-	public var boneWeights:VertexBuffer3D = null;
-	public var boneIndices:VertexBuffer3D = null;
+	/**
+		An array containing vertex buffers for this mesh.
+
+		Access them via `buffers[FoxVertexBufferType.<type>]`
+	**/
+	public var buffers:Array<FoxVertexBuffer> = [
+		null, null, null, null, null, null,
+		null
+	];
 
 	/**
-		The buffer usage pattern for optimization purposes.
+		An array containing levels of detail for this mesh
+
+		__Note:__ LODs are yet to be implemented
+	**/
+	public var lods:Array<Array<FoxVertexBuffer>>;
+
+	/**
+		The buffer usage pattern for optimization purposes. Set it to true if you're updating mesh buffers constantly
 
 		__Note:__ This will be applied on the next call to `setArrays()`.
 	**/
 	public var bufferUsage:Int = 0x88E4; // Only for initialization, corresponds to GL.STATIC_DRAW
-
-	/**
-		By default, this mesh will use 3 vertices per face (a triangle),
-		but you can change it to 4 (quads) or 2 (lines).
-
-		This will affect how the mesh is processed when drawing.
-
-		__Note:__ To apply it correctly, call `setArrays()` directly afterwards.
-
-		__Note 2:__ This currently needs to be implemented.
-	**/
-	public var vertexPerFace:Int = 3;
 
 	public var material(default, set):FoxMaterial = null;
 	public var assetsKey:String = null;
@@ -75,7 +71,7 @@ class FoxMesh {
 		@param type The buffer to write to
 		@param data The data array
 	**/
-	public function setBuffer(type:FoxMeshBufferType, data:Array<Float>) {
+	public function setBuffer(type:FoxVertexBufferType, data:Array<Float>) {
 		setBufferRaw(type, TypedArray.Float32Array(cast data));
 		FoxRenderer.allocationsThisFrame += 1;
 	}
@@ -84,21 +80,28 @@ class FoxMesh {
 		Writes buffer data on the GPU using an existing `ArrayBufferView`.
 		This method runs faster than `setBuffer`
 	**/
-	public function setBufferRaw(type:FoxMeshBufferType, data:ArrayBufferView) {
-		var buffer = getBufferByType(type);
-		buffer.uploadFromTypedArray(data);
+	public function setBufferRaw(type:FoxVertexBufferType, data:ArrayBufferView) {
+		buffers[type]?.uploadFromTypedArray(data);
 	}
 
 	/**
 		Same as `setBuffer()` but exclusive to the Index buffer
+
+		__Note:__ This uses a UInt16Array internally, if your model has meshes with over 65k unique vertices, consider using 
+		`setIndexBufferBig()` instead
 	**/
 	public function setIndexBuffer(data:Array<Int>) {
 		setIndexBufferRaw(TypedArray.UInt16Array(cast data));
 		FoxRenderer.allocationsThisFrame += 1;
 	}
 
+	public function setIndexBufferBig(data:Array<Int>) {
+		setIndexBufferRaw(TypedArray.UInt32Array(cast data));
+		FoxRenderer.allocationsThisFrame += 1;
+	}
+
 	public function setIndexBufferRaw(data:UInt16Array) {
-		indexBuffer.uploadFromTypedArray(data);
+		buffers[FoxVertexBufferType.INDICES]?.uploadFromTypedArray(data);
 	}
 
 	/**
@@ -111,21 +114,13 @@ class FoxMesh {
 		@param data The data array
 		@param offset The index of the buffer where to start writing `data`
 	**/
-	public function updateBuffer(type:FoxMeshBufferType, data:Array<Float>, offset:Int=0) {
+	public function updateBuffer(type:FoxVertexBufferType, data:Array<Float>, offset:Int=0) {
 		var gl = context.gl;
-		offset *= 4; // Offset is actually in bytes
-		var buffer = getBufferByType(type);
-		context.__bindGLArrayBuffer(buffer.__id);
+		var buffer = buffers[type];
+		if(buffer == null) return;
+		offset *= buffer.bytesPerElement;
 		var packed = TypedArray.Float32Array(cast data);
-		#if foxlite_polymod
-		#if lime_webgl
-		GL.bufferSubDataWEBGL(gl.ARRAY_BUFFER, offset, packed);
-		#else
-		GL.bufferSubData(gl.ARRAY_BUFFER, offset, data.length*4, DataPointer.fromArrayBufferView(packed));
-		#end
-		#else
-		gl.bufferSubData(gl.ARRAY_BUFFER, offset, packed);
-		#end
+		buffer.updateFromTypedArray(packed, offset);
 		FoxRenderer.allocationsThisFrame += 1;
 	}
 
@@ -134,18 +129,12 @@ class FoxMesh {
 	**/
 	public function updateIndexBuffer(data:Array<Int>, offset:Int=0) {
 		var gl = context.gl;
-		offset *= 2; // Offset is actually in bytes
-		context.__bindGLElementArrayBuffer(indexBuffer.__id);
+		var buffer = buffers[FoxVertexBufferType.INDICES];
+		if(buffer == null) return;
+		offset *= buffer.bytesPerElement; // Offset is actually in bytes
 		var packed = TypedArray.UInt16Array(cast data);
-		#if foxlite_polymod
-		#if lime_webgl
-		GL.bufferSubDataWEBGL(gl.ELEMENT_ARRAY_BUFFER, offset, packed);
-		#else
-		GL.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, offset, data.length*2, DataPointer.fromArrayBufferView(packed));
-		#end
-		#else
-		gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, offset, packed);
-		#end
+		buffer.updateFromTypedArray(packed, offset);
+		FoxRenderer.allocationsThisFrame += 1;
 	}
 
 	/**
@@ -154,106 +143,107 @@ class FoxMesh {
 
 		This method is faster than the other ones, but needs more setup.
 	**/
-	public function updateBufferRaw(type:FoxMeshBufferType, data:ArrayBufferView, offset:Int=0) {
-		var gl = context.gl;
-		if(type == FoxMeshBufferType.INDICES) {
-			context.__bindGLElementArrayBuffer(indexBuffer.__id);
-			#if foxlite_polymod
-			#if lime_webgl
-			GL.bufferSubDataWEBGL(gl.ELEMENT_ARRAY_BUFFER, offset, packed);
-			#else
-			GL.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, offset, data.length, DataPointer.fromArrayBufferView(data));
-			#end
-			#else
-			gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, offset, data);
-			#end
-		}
-		else {
-			var buffer = getBufferByType(type);
-			context.__bindGLArrayBuffer(buffer.__id);
-			#if foxlite_polymod
-			#if lime_webgl
-			GL.bufferSubDataWEBGL(gl.ARRAY_BUFFER, offset, packed);
-			#else
-			GL.bufferSubData(gl.ARRAY_BUFFER, offset, data.length, DataPointer.fromArrayBufferView(data));
-			#end
-			#else
-			gl.bufferSubData(gl.ARRAY_BUFFER, offset, data);
-			#end
-		}
+	public inline function updateBufferRaw(type:FoxVertexBufferType, data:ArrayBufferView, byteOffset:Int=0) {
+		buffers[type]?.updateFromTypedArray(data, byteOffset);
+	}
+
+	public inline function disposeBuffer(type:FoxVertexBufferType) {
+		buffers[type]?.dispose();
 	}
 
 	/**
 		Creates buffers and uploads data to the GPU.
+
+		@param vertices Positions (xyz)
+		@param uvtData Texture coordinates (u,v)
+		@param indices Vertex index (i)
+		@param material_ The material for this mesh
+		@param normals Vertex normals (x,y,z)
+		@param colors Vertex colors (r,g,b,a)
+		@param weights Skin weights (w1,w2,w3,w4)
+		@param influences Joints (j1, j2, j3, j4)
+		@param bigIndices Use ~4.3 billion vertex pointers per index instead of 65536 (UInt32 instead of UInt16)
+		@param bigInfluence Use 65536 influence pointers per joint instead of 256 (UInt16 instead of UInt8)
 	**/
-	public function setArrays(?vertices:Array<Float>, ?uvtData:Array<Float>, ?indices:Array<Int>, ?material_:FoxMaterial, ?normals:Array<Float>, ?colors:Array<Float>, ?weights:Array<Float>, ?influences:Array<Int>) {
+	public function setArrays(?vertices:Array<Float>, ?uvtData:Array<Float>, ?indices:Array<Int>, ?material_:FoxMaterial, ?normals:Array<Float>, ?colors:Array<Float>, ?weights:Array<Float>, ?influences:Array<Int>, bigIndices:Bool=false, bigInfluence:Bool=false) {
 		if(material_ != null) material = material_;
 
 		if(vertices?.length > 0) {
-			vertexBuffer?.dispose();
-			vertexBuffer = context.createVertexBuffer(Std.int(vertices.length / 3), 3);
-			vertexBuffer.__usage = bufferUsage;
-			setBuffer(FoxMeshBufferType.VERTICES, vertices); // Upload to GPU
+			disposeBuffer(FoxVertexBufferType.VERTICES);
+			var buffer:FoxVertexBuffer = new FoxVertexBuffer(Std.int(vertices.length / 3), 3);
+			buffer.usage = bufferUsage;
+			buffers[FoxVertexBufferType.VERTICES] = buffer;
+			setBuffer(FoxVertexBufferType.VERTICES, vertices); // Upload to GPU
 			FoxRenderer.allocationsThisFrame += 1;
 		}
 
 		if(uvtData?.length > 0) {
-			uvBuffer?.dispose();
-			uvBuffer = context.createVertexBuffer(Std.int(uvtData.length / 2), 2);
-			uvBuffer.__usage = bufferUsage;
-			setBuffer(FoxMeshBufferType.UVS, uvtData); // Upload to GPU
+			disposeBuffer(FoxVertexBufferType.UVS);
+			var buffer:FoxVertexBuffer = new FoxVertexBuffer(Std.int(uvtData.length / 2), 2);
+			buffer.usage = bufferUsage;
+			buffers[FoxVertexBufferType.UVS] = buffer;
+			setBuffer(FoxVertexBufferType.UVS, uvtData); // Upload to GPU
 			FoxRenderer.allocationsThisFrame += 1;
 		}
 
 		if(indices?.length > 0) {
-			indexBuffer?.dispose();
-			indexBuffer = context.createIndexBuffer(indices.length);
-			setIndexBuffer(indices); // Upload to GPU
+			disposeBuffer(FoxVertexBufferType.INDICES);
+			var buffer:FoxIndexBuffer = new FoxIndexBuffer(indices.length, 1);
+			buffer.usage = bufferUsage;
+			buffers[FoxVertexBufferType.INDICES] = buffer;
+			if(bigIndices) 
+				setIndexBufferBig(indices);
+			else
+				setIndexBuffer(indices); 
 			FoxRenderer.allocationsThisFrame += 1;
 		}
 
 		if(normals?.length > 0) {
-			normalBuffer?.dispose();
-			tangentBuffer?.dispose();
+			disposeBuffer(FoxVertexBufferType.NORMALS);
+			disposeBuffer(FoxVertexBufferType.TANGENTS);
 
-			normalBuffer = context.createVertexBuffer(Std.int(normals.length / 3), 3);
-			tangentBuffer = context.createVertexBuffer(Std.int(normals.length / 3), 4);
+			var normalBuffer:FoxVertexBuffer = new FoxVertexBuffer(Std.int(normals.length / 3), 3);
+			var tangentBuffer:FoxVertexBuffer = new FoxVertexBuffer(Std.int(normals.length / 3), 4);
 			FoxRenderer.allocationsThisFrame += 2;
 
-			normalBuffer.__usage = bufferUsage;
-			tangentBuffer.__usage = bufferUsage;
+			normalBuffer.usage = bufferUsage;
+			tangentBuffer.usage = bufferUsage;
+
+			buffers[FoxVertexBufferType.NORMALS] = normalBuffer;
+			buffers[FoxVertexBufferType.TANGENTS] = tangentBuffer;
 
 			// Upload to GPU
-			setBuffer(FoxMeshBufferType.NORMALS, normals);
+			setBuffer(FoxVertexBufferType.NORMALS, normals);
 			var tangents = FoxMesh.computeTangents(vertices, uvtData, normals, indices);
-			if(tangents != null) setBuffer(FoxMeshBufferType.TANGENTS, tangents);
+			if(tangents != null) setBuffer(FoxVertexBufferType.TANGENTS, tangents);
 		}
 
 		if(colors?.length > 0) {
-			colorBuffer?.dispose();
-			colorBuffer = context.createVertexBuffer(Std.int(colors.length / 4), 4);
-			colorBuffer.__usage = bufferUsage;
-			setBuffer(FoxMeshBufferType.COLORS, colors); // Upload to GPU
+			disposeBuffer(FoxVertexBufferType.COLORS);
+			var buffer:FoxVertexBuffer = new FoxVertexBuffer(Std.int(colors.length / 4), 4);
+			buffer.usage = bufferUsage;
+			buffers[FoxVertexBufferType.COLORS] = buffer;
+			setBuffer(FoxVertexBufferType.COLORS, colors); // Upload to GPU
 			FoxRenderer.allocationsThisFrame += 1;
 		}
 		
 		// For skinning
 
 		if(weights?.length > 0) {
-			boneWeights?.dispose();
-			boneWeights = context.createVertexBuffer(Std.int(weights.length / 4), 4);
-			boneWeights.__usage = bufferUsage;
-			setBuffer(FoxMeshBufferType.WEIGHTS, weights); // Upload to GPU
+			disposeBuffer(FoxVertexBufferType.WEIGHTS);
+			var buffer:FoxVertexBuffer = new FoxVertexBuffer(Std.int(weights.length / 4), 4);
+			buffer.usage = bufferUsage;
+			buffers[FoxVertexBufferType.WEIGHTS] = buffer;
+			setBuffer(FoxVertexBufferType.WEIGHTS, weights); // Upload to GPU
 			FoxRenderer.allocationsThisFrame += 1;
 		}
 
 		if(influences?.length > 0) {
-			boneIndices?.dispose();
-			boneIndices = context.createVertexBuffer(Std.int(influences.length / 4), 4);
-			boneIndices.__stride = 4;
-			boneIndices.__usage = bufferUsage;
-			//setBuffer(FoxMeshBufferType.BONE_INDICES, influences); // Upload to GPU
-			setBufferRaw(FoxMeshBufferType.BONE_INDICES, TypedArray.UInt8ClampedArray(influences));
+			disposeBuffer(FoxVertexBufferType.BONE_INDICES);
+			var buffer:FoxVertexBuffer = new FoxVertexBuffer(Std.int(influences.length / 4), 4);
+			buffer.usage = bufferUsage;
+			buffers[FoxVertexBufferType.BONE_INDICES] = buffer;
+			setBufferRaw(FoxVertexBufferType.BONE_INDICES, bigInfluence ? TypedArray.UInt16Array(influences) : TypedArray.UInt8ClampedArray(influences));
 			FoxRenderer.allocationsThisFrame += 2;
 		}
 	}
@@ -378,19 +368,10 @@ class FoxMesh {
 	/**
 		Returns a vertex buffer of this mesh.
 
-		@param type The buffer type. See `FoxMeshBufferType`
+		@param type The buffer type. See `FoxVertexBufferType`
 	**/
-	public function getBufferByType(type:FoxMeshBufferType):VertexBuffer3D {
-		return switch(type) {
-			case FoxMeshBufferType.VERTICES: vertexBuffer;
-			case FoxMeshBufferType.UVS: uvBuffer;
-			case FoxMeshBufferType.NORMALS: normalBuffer;
-			case FoxMeshBufferType.TANGENTS: tangentBuffer;
-			case FoxMeshBufferType.COLORS: colorBuffer;
-			case FoxMeshBufferType.WEIGHTS: boneWeights;
-			case FoxMeshBufferType.BONE_INDICES: boneIndices;
-			default: null;
-		}
+	@:deprecated public function getBufferByType(type:FoxVertexBufferType):FoxVertexBuffer {
+		return buffers[type];
 	}
 
 	/*
@@ -439,14 +420,7 @@ class FoxMesh {
 	**/
 	public function copy():FoxMesh {
 		var mesh = new FoxMesh();
-		mesh.vertexBuffer = vertexBuffer;
-		mesh.uvBuffer = uvBuffer;
-		mesh.indexBuffer = indexBuffer;
-		mesh.normalBuffer = normalBuffer;
-		mesh.tangentBuffer = tangentBuffer;
-		mesh.colorBuffer = colorBuffer;
-		mesh.boneWeights = boneWeights;
-		mesh.boneIndices = boneIndices;
+		mesh.buffers = buffers.copy();
 		mesh.material = material;
 		mesh.assetsKey = null;
 		mesh.bounds = bounds;
@@ -456,14 +430,7 @@ class FoxMesh {
 
 	public function destroy() {
 		if(__isCopy) return;
-		vertexBuffer?.dispose();
-		uvBuffer?.dispose();
-		indexBuffer?.dispose();
-		normalBuffer?.dispose();
-		tangentBuffer?.dispose();
-		colorBuffer?.dispose();
-		boneWeights?.dispose();
-		boneIndices?.dispose();
+		for(b in buffers) b?.dispose();
 
 		if(assetsKey == null) return;
 		var cache = FoxCache.meshes().get(assetsKey);

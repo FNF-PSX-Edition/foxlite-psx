@@ -3,6 +3,7 @@ package foxlite.mesh;
 import haxe.ds.IntMap;
 import foxlite.material.FoxMaterial;
 import foxlite.mesh.FoxMesh;
+import foxlite.mesh.buffer.FoxVertexBufferType;
 import foxlite.renderer.FoxRenderer;
 import flixel.util.FlxColor;
 import openfl.geom.Vector3D;
@@ -90,9 +91,9 @@ class FoxLineMesh extends FoxMesh {
 		Call this after updating lines with `updateLine()`
 	**/
 	public function flushUpdates() {
-		for(offset => data in __vertexUpdates) updateBuffer(FoxMeshBufferType.VERTICES, data, offset);
-		for(offset => data in __colorsUpdates) updateBuffer(FoxMeshBufferType.COLORS, data, offset);
-		for(offset => data in __uvsUpdates) updateBuffer(FoxMeshBufferType.UVS, data, offset);
+		for(offset => data in __vertexUpdates) updateBuffer(FoxVertexBufferType.VERTICES, data, offset);
+		for(offset => data in __colorsUpdates) updateBuffer(FoxVertexBufferType.COLORS, data, offset);
+		for(offset => data in __uvsUpdates) updateBuffer(FoxVertexBufferType.UVS, data, offset);
 		__vertexUpdates.clear();
 		__colorsUpdates.clear();
 		__uvsUpdates.clear();

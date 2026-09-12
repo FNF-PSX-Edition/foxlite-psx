@@ -24,7 +24,7 @@ import foxlite.material.FoxBlendMode;
 import foxlite.material.FoxMaterial;
 import foxlite.material.FoxTriangleFace;
 import foxlite.math.FoxMathUtil;
-import foxlite.mesh.FoxMeshBufferType;
+import foxlite.mesh.buffer.FoxVertexBufferType;
 import foxlite.mesh.FoxQuadMesh;
 import foxlite.polyfill.TypedArray;
 import foxlite.texture.FoxTexture;
@@ -115,7 +115,7 @@ class FoxFlxSprite extends FoxModel {
 				uvsRaw[2] = 1; uvsRaw[3] = 0;
 				uvsRaw[4] = 1; uvsRaw[5] = 1;
 				uvsRaw[6] = 0; uvsRaw[7] = 1;
-				mesh.updateBufferRaw(FoxMeshBufferType.UVS, uvsRaw);
+				mesh.updateBufferRaw(FoxVertexBufferType.UVS, uvsRaw);
 				__defaultUVs = true;
 			}
 
@@ -123,7 +123,7 @@ class FoxFlxSprite extends FoxModel {
 			verticesRaw[3] =  w; verticesRaw[4] =  h; //verticesRaw[5] = 0;
 			verticesRaw[6] =  w; verticesRaw[7] = -h; //verticesRaw[8] = 0;
 			verticesRaw[9] = -w; verticesRaw[10] = -h; //verticesRaw[11] = 0;
-			mesh.updateBufferRaw(FoxMeshBufferType.VERTICES, verticesRaw);
+			mesh.updateBufferRaw(FoxVertexBufferType.VERTICES, verticesRaw);
 		}
 		else {
 			var width = sprite.pixels.width;
@@ -151,7 +151,7 @@ class FoxFlxSprite extends FoxModel {
 				};
 			}
 			
-			mesh.updateBufferRaw(FoxMeshBufferType.UVS, uvsRaw);
+			mesh.updateBufferRaw(FoxVertexBufferType.UVS, uvsRaw);
 			
 			final ps = pixelSize;
 			var sw = frame.width * ps;
@@ -182,7 +182,7 @@ class FoxFlxSprite extends FoxModel {
 				}
 			}
 			
-			mesh.updateBufferRaw(FoxMeshBufferType.VERTICES, verticesRaw);
+			mesh.updateBufferRaw(FoxVertexBufferType.VERTICES, verticesRaw);
 		}
 		if(__recalculateBounds) {
 			mesh.calculateBounds(verticesRaw); // For frustum culling
