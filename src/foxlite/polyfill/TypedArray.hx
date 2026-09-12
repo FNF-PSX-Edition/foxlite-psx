@@ -17,16 +17,16 @@ import lime.utils.UInt8ClampedArray;
 class TypedArray {
 
 	// Typed array types
-	static final None = 0;
-	static final Int8 = 1;
-	static final Int16 = 2;
-	static final Int32 = 3;
-	static final Uint8 = 4;
-	static final Uint8Clamped = 5;
-	static final Uint16 = 6;
-	static final Uint32 = 7;
-	static final Float32 = 8;
-	static final Float64 = 9;
+	public static inline final None = 0;
+	public static inline final Int8 = 1;
+	public static inline final Int16 = 2;
+	public static inline final Int32 = 3;
+	public static inline final Uint8 = 4;
+	public static inline final Uint8Clamped = 5;
+	public static inline final Uint16 = 6;
+	public static inline final Uint32 = 7;
+	public static inline final Float32 = 8;
+	public static inline final Float64 = 9;
 
 	#if foxlite_polymod
 	public inline static function Int8Array(data:Array<Int>):ArrayBufferView {

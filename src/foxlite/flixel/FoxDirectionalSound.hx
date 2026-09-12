@@ -61,7 +61,11 @@ class FoxDirectionalSound extends FoxObject {
 	public var propagationSpeed:Float = 343;
 
 	var prevDistance:Float = 0; // Previous frame distance to calculate doppler shift
-	var playDistance:Float = 0; // Distance from camera that was set since the last `play()` call
+
+	/**
+		Distance from camera that was set since the last `play()` call
+	**/
+	public var playDistance:Float = 0; 
 
 	/**
 		The queued sound parameters for propagation
@@ -76,6 +80,11 @@ class FoxDirectionalSound extends FoxObject {
 		The index of the camera to follow in the scene.
 	**/
 	public var cameraIndex:Int = 0;
+
+	/**
+		If playing with realistic propagation, this event will fire when the sound "reaches" the camera
+	**/
+	public var onSoundReached:FlxTypedSignalImpl<()->Void> = new FlxTypedSignalImpl();
 
 	public function new(target:FlxSound) {
 		super();
@@ -112,7 +121,10 @@ class FoxDirectionalSound extends FoxObject {
 		if(playDistance != 0) {
 			queued.currentTime += dt;
 			queued.currentTime -= getDelayFromDistance(distanceDelta); // Play it sooner or later based on camera movement
-			if(queued.currentTime >= queued.targetTime) _play();
+			if(queued.currentTime >= queued.targetTime) {
+				onSoundReached.dispatch();
+				_play();
+			}
 		}
 	}
 

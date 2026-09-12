@@ -4,7 +4,7 @@ import flixel.math.FlxMatrix;
 import foxlite.flixel.FoxFlxSprite;
 import foxlite.material.FoxMaterial;
 import foxlite.material.FoxTriangleFace;
-import foxlite.mesh.FoxMeshBufferType;
+import foxlite.mesh.buffer.FoxVertexBufferType;
 #if (foxlite_polymod || polymod)
 import funkin.graphics.FunkinSprite;
 #else
@@ -78,7 +78,7 @@ class FoxFunkinSprite extends FoxFlxSprite {
 			uvsRaw[2] = 1; uvsRaw[3] = 0;
 			uvsRaw[4] = 1; uvsRaw[5] = 1;
 			uvsRaw[6] = 0; uvsRaw[7] = 1;
-			mesh.updateBufferRaw(FoxMeshBufferType.UVS, uvsRaw);
+			mesh.updateBufferRaw(FoxVertexBufferType.UVS, uvsRaw);
 			__defaultUVs = true;
 		}
 		
@@ -93,7 +93,7 @@ class FoxFunkinSprite extends FoxFlxSprite {
 		verticesRaw[3] = f1X; verticesRaw[4] = f0Y; //verticesRaw[5] = 0;
 		verticesRaw[6] = f1X; verticesRaw[7] = f1Y; //verticesRaw[8] = 0;
 		verticesRaw[9] = f0X; verticesRaw[10] = f1Y; //verticesRaw[11] = 0;
-		mesh.updateBufferRaw(FoxMeshBufferType.VERTICES, verticesRaw);
+		mesh.updateBufferRaw(FoxVertexBufferType.VERTICES, verticesRaw);
 
 		if(__recalculateBounds) {
 			mesh.calculateBounds(verticesRaw); // For frustum culling

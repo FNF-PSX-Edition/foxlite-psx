@@ -7,6 +7,7 @@ import foxlite.loaders.FoxJSONLoader;
 import foxlite.loaders.FoxOBJLoader;
 import foxlite.material.FoxMaterial;
 import foxlite.mesh.FoxMesh;
+import foxlite.mesh.buffer.FoxVertexBufferType;
 import foxlite.renderer.FoxRenderer;
 import foxlite.skin.FoxSkinData;
 import openfl.display3D.Context3D;
@@ -15,7 +16,17 @@ import openfl.geom.Matrix3D;
 class FoxModel extends FoxObject {
 
 	public var layers:FoxLayer;
+
+	/**
+		If enabled, this will perform frustum culling, meaning this object will disable its rendering when it's not
+		visible by the camera. If you have many many objects on-screen that shouldn't be visible off-screen,
+		keep this enabled
+	**/
 	public var frustumCulling:Bool;
+	/**
+		The scale for the meshes extents, increase this if your object gets culled too early
+	**/
+	public var cullMargin:Float = 1;
 
 	public var context:Context3D;
 
@@ -130,7 +141,7 @@ class FoxModel extends FoxObject {
 
 	// Just a proxy to make things easier
 	public function renderMesh(mesh:FoxMesh, shader:FoxShader) {
-		if(mesh.indexBuffer != null) FoxRenderer.drawMesh(context, mesh, shader);
+		if(mesh.buffers[FoxVertexBufferType.INDICES] != null) FoxRenderer.drawMesh(context, mesh, shader);
 	}
 
 	public function isInstanced() {

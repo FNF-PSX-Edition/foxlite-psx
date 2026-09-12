@@ -74,12 +74,13 @@ class FoxOBJLoader {
 		var __prevMesh:FoxMesh = null;
 		var meshes:Array<FoxMesh> = [];
 		var groupBuildStage:Int = -1;
+		var bigIndices:Bool = false;
 
 		var materials:Map<String, FoxMaterial> = new StringMap();
 		var matPath:String = null; // But it's just a theory
 
 		function finishMesh() {
-			curMesh?.setArrays(vertices, uvtData, indices, null, normals);
+			curMesh?.setArrays(vertices, uvtData, indices, null, normals, colors, null, null, bigIndices);
 			curMesh?.calculateBounds(vertices);
 			if(curMesh != null && curMesh.material == null) curMesh.material = FoxRenderer.MISSING_MATERIAL; // What happened to our material...
 					
@@ -95,6 +96,7 @@ class FoxOBJLoader {
 			colors.resize(0); colorsRaw.resize(0);
 			uniqueIDs.clear();
 			curIndex = 0;
+			bigIndices = false;
 
 			vertexOffset = vertexCount;
 			textureOffset = textureCount;
@@ -206,6 +208,7 @@ class FoxOBJLoader {
 
 						uniqueIDs.set(d, curIndex);
 						curIndex += 1;
+						if(curIndex > 65535) bigIndices = true;
 					}
 				}
 				if(data.length == 4) { // If we're working with quads we need to triangulate
@@ -225,7 +228,7 @@ class FoxOBJLoader {
 
 		// EOF reached
 		// Finish pending mesh
-		curMesh?.setArrays(vertices, uvtData, indices, null, normals, colors);
+		curMesh?.setArrays(vertices, uvtData, indices, null, normals, colors, null, null, bigIndices);
 		curMesh?.calculateBounds(vertices);
 		if(curMesh != null && curMesh.material == null) curMesh.material = FoxRenderer.MISSING_MATERIAL; // What happened to our material...
 

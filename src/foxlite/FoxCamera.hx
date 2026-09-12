@@ -1,5 +1,6 @@
 package foxlite;
 
+import flixel.math.FlxPoint;
 import flixel.util.FlxColor;
 import foxlite.FoxLayer;
 import foxlite.animation.FoxLerp;
@@ -48,6 +49,11 @@ class FoxCamera extends FoxObject {
 	public var projectionMatrix:Matrix3D = new Matrix3D();
 	public var __invProjectionMatrix:Matrix3D = new Matrix3D(); // For raytracing effects
 	public var __invSkyViewMatrix:Matrix3D = new Matrix3D();
+
+	/**
+		Origin of the screen to where a perspective or isometric view would rotate
+	**/
+	public var projectionOrigin:FlxPoint = FlxPoint.get(0, 0);
 
 	/**
 		This is the view matrix from a previous frame, used for motion vector calculations
@@ -111,7 +117,8 @@ class FoxCamera extends FoxObject {
 			__invSkyViewData[i] = __invSkyViewMatrix.rawData[i];
 		}
 
-		if(__updateProjection) {
+		var hasOffset = !projectionOrigin.isZero();
+		if(__updateProjection || hasOffset) {
 			__aspect = scene != null ? scene.__width / scene.__height : 1;
 			__aspect *= aspect;
 			
@@ -121,7 +128,25 @@ class FoxCamera extends FoxObject {
 			else {
 				FoxMathUtil.orthogonalMatrix(projectionMatrix, fov, __aspect, near, far);
 			}
-			
+
+			if(hasOffset) {
+				// shift like blender does
+				var sx = projectionOrigin.x;
+				var sy = projectionOrigin.y;
+
+				if(__aspect >= 1) sy *= __aspect;
+				else sx /= __aspect;
+				
+				if(!orthogonal) {
+					projectionMatrix.rawData.__array[8] = sx * 2;
+					projectionMatrix.rawData.__array[9] = sy * 2;
+				}
+				else {
+					projectionMatrix.rawData.__array[12] = sx * 2;
+					projectionMatrix.rawData.__array[13] = sy * 2;
+				}
+			}
+
 			__updateProjection = false;
 		}
 
@@ -187,19 +212,28 @@ class FoxCamera extends FoxObject {
 		return v;
 	}
 
-	public function toFlixelScreenPoint(point:Vector3D, screenWidth:Float, screenHeight:Float, ?output:Vector2):Vector2 {
+	public function toFlixelScreenPoint(point:Vector3D, screenWidth:Float, screenHeight:Float, ?output:FlxPoint):FlxPoint {
 		final HW = screenWidth*.5;
 		final HH = screenHeight*.5;
 
 		if(output == null) {
-			output = new Vector2();
+			output = FlxPoint.get(0, 0);
 			FoxRenderer.allocationsThisFrame += 1;
 		}
-		output.setTo(
+		output.set(
 			HW + point.x * HW,
 			screenHeight - (HH + point.y * HH)
 		);
 		return output;
+	}
+
+	/**
+		Shortcut method, calls `getScreenPoint()` and then `toFlixelScreenPoint()`
+
+		Also returns a `FlxPoint instead`
+	**/
+	public inline function getFlixelScreenPoint(position:Vector3D, screenWidth:Float, screenHeight:Float):FlxPoint {
+		return toFlixelScreenPoint(getScreenPoint(position), screenWidth, screenHeight);
 	}
 
 	/**

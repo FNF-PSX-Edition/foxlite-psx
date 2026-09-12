@@ -12,6 +12,8 @@ import foxlite.material.FoxBlendMode;
 import foxlite.material.FoxMaterial;
 import foxlite.math.FoxMathUtil;
 import foxlite.mesh.FoxMesh;
+import foxlite.mesh.buffer.FoxVertexBufferType;
+import foxlite.mesh.buffer.FoxVertexBuffer;
 import foxlite.polyfill.VectorFactory;
 import foxlite.flixel.FlxTypedSignalImpl;
 import foxlite.system.Int32BufferCache;
@@ -29,7 +31,6 @@ import lime.utils.DataPointer;
 import lime.utils.Float32Array;
 import openfl.display3D.Context3D;
 import openfl.display3D.Program3D;
-import openfl.display3D.VertexBuffer3D;
 import openfl.display3D.textures.CubeTexture;
 import openfl.display3D.textures.Texture;
 import openfl.geom.Rectangle;
@@ -43,14 +44,15 @@ typedef FoxGLExtensions = {
 	?drawBuffersEXT:Dynamic, // WebGL 1
 	?depthTexture:Dynamic,
 	?textureFloat:Dynamic,
-	?textureHalfFloat:Dynamic
+	?textureHalfFloat:Dynamic,
+	?elementIndexUint:Dynamic // WebGL 1
 };
 
 // TODO: Make this a singleton so we don't use this many static vars
 class FoxRenderer {
 
 	public static final BUILD_NAME = "Beta";
-	public static final VERSION = "0.1.5";
+	public static final VERSION = "0.2.1";
 
 	public static var frameCount:Int = 0;
 	public static var drawCalls:Int = 0;
@@ -106,6 +108,12 @@ class FoxRenderer {
 		This technique might require a bit more memory since previous transfomation matrices are stored in memory for each object.
 	**/
 	public static var calculateMotionVectors:Bool = false;
+
+	/**
+		If enabled, raw buffer data loaded from models will be stored in `FoxVertexBuffer`s, allowing you to modify them
+		and upload them to the GPU
+	**/
+	public static var preserveGLBufferData:Bool = false;
 
 	/**
 		If greater than 0, forces the renderer to render using `GL.LINES` with the specified width
@@ -177,6 +185,8 @@ class FoxRenderer {
 		extensions.textureHalfFloat = GL.getExtension("OES_texture_half_float")
 								   ?? GL.getExtension("ARB_half_float_pixel")
 								   ?? GL.getExtension("ARB_half_float_vertex");
+
+		extensions.elementIndexUint = GL.getExtension("OES_element_index_uint");
 
 		trace('[FoxLite > FoxRenderer]: Texture Anisotropy ${extensions.anisotropic == null ?  "not" : "is"} supported.');
 
@@ -674,37 +684,38 @@ class FoxRenderer {
 		Renders a mesh, simple as that! Render pipeline must be set up for this.
 	**/
 	public static function drawMesh(context:Context3D, mesh:FoxMesh, shader:FoxShader) {
-		@:privateAccess var elements:Int = mesh.indexBuffer.__numIndices; // How many vertices we are drawing
+		final indexBuffer = mesh.buffers[FoxVertexBufferType.INDICES];
+		var elements = indexBuffer?.count ?? 0;
 		if(elements == 0) return;
 		var gl = context.gl;
 		var attrib = shader.attribIdx;
 
 		// Attributes
-		context.setVertexBufferAt(attrib.position, mesh.vertexBuffer, 0, cast 3);
-		if(attrib.texCoord != -1) context.setVertexBufferAt(attrib.texCoord, mesh.uvBuffer, 0, cast 2);
-		
+		FoxRenderer.setAttributePointerAt(attrib.position, mesh.buffers[FoxVertexBufferType.VERTICES]);
+		if(attrib.texCoord != -1) 
+			FoxRenderer.setAttributePointerAt(attrib.texCoord, mesh.buffers[FoxVertexBufferType.UVS]);
+
 		if(attrib.normal != -1) {
-			context.setVertexBufferAt(attrib.normal, mesh.normalBuffer, 0, cast 3);		
-			context.setVertexBufferAt(attrib.tangent, mesh.tangentBuffer, 0);
+			FoxRenderer.setAttributePointerAt(attrib.normal, mesh.buffers[FoxVertexBufferType.NORMALS]);
+			FoxRenderer.setAttributePointerAt(attrib.tangent, mesh.buffers[FoxVertexBufferType.TANGENTS]);
 		}
 
-		if(attrib.color != -1) context.setVertexBufferAt(attrib.color, mesh.colorBuffer, 0);
+		if(attrib.tangent != -1)
+			FoxRenderer.setAttributePointerAt(attrib.tangent, mesh.buffers[FoxVertexBufferType.TANGENTS]);
 
-		// Skinning
-		if(attrib.boneWeight != -1) context.setVertexBufferAt(attrib.boneWeight, mesh.boneWeights, 0);
-		if(attrib.boneIndex != -1) switch(mesh.boneIndices?.__stride ?? -1) {
-			case 4: FoxRenderer.vertexAtrribPtrUByte(context, attrib.boneIndex, mesh.boneIndices); // Unsigned Byte
-			case 8: FoxRenderer.vertexAtrribPtrUShort(context, attrib.boneIndex, mesh.boneIndices); // Unsigned Short
-			default: {
-				GL.disableVertexAttribArray(attrib.boneIndex);
-				context.__bindGLArrayBuffer(null);
-			}
-		}
+		if(attrib.color != -1)
+			FoxRenderer.setAttributePointerAt(attrib.color, mesh.buffers[FoxVertexBufferType.COLORS]);
+
+		if(attrib.boneWeight != -1)
+			FoxRenderer.setAttributePointerAt(attrib.boneWeight, mesh.buffers[FoxVertexBufferType.WEIGHTS]);
+
+		if(attrib.boneIndex != -1)
+			FoxRenderer.setAttributePointerAt(attrib.boneIndex, mesh.buffers[FoxVertexBufferType.BONE_INDICES]);
 
 		// Draw things the OpenGL way
 		@:privateAccess // Shut up haxe everything is okay
-		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.indexBuffer.__id);
-		gl.drawElements(FoxRenderer.renderMode, elements, gl.UNSIGNED_SHORT, 0);
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer.id);
+		gl.drawElements(FoxRenderer.renderMode, elements, indexBuffer.type, 0);
 		
 		FoxRenderer.drawCalls += 1;
 		FoxRenderer.verticesDrawn += elements;
@@ -719,56 +730,54 @@ class FoxRenderer {
 		__Note 2:__ Instancing operations only works in OpenGL 3.0+
 	**/
 	public static function drawMeshInstanced(context:Context3D, mesh:FoxMesh, shader:FoxShader, count:Int, instanceData:FoxInstanceData) {
-		@:privateAccess var elements:Int = mesh.indexBuffer.__numIndices; // How many vertices we are drawing
+		final indexBuffer = mesh.buffers[FoxVertexBufferType.INDICES];
+		var elements = indexBuffer?.count ?? 0;
 		if(elements == 0) return;
 		var gl = context.gl;
 		var attrib = shader.attribIdx;
 
 		// Attributes
-		context.setVertexBufferAt(attrib.position, mesh.vertexBuffer, 0, cast 3);
-		if(attrib.texCoord != -1) context.setVertexBufferAt(attrib.texCoord, mesh.uvBuffer, 0, cast 2);
-		
+		FoxRenderer.setAttributePointerAt(attrib.position, mesh.buffers[FoxVertexBufferType.VERTICES]);
+		if(attrib.texCoord != -1) 
+			FoxRenderer.setAttributePointerAt(attrib.texCoord, mesh.buffers[FoxVertexBufferType.UVS]);
+
 		if(attrib.normal != -1) {
-			context.setVertexBufferAt(attrib.normal, mesh.normalBuffer, 0, cast 3);		
-			context.setVertexBufferAt(attrib.tangent, mesh.tangentBuffer, 0);
+			FoxRenderer.setAttributePointerAt(attrib.normal, mesh.buffers[FoxVertexBufferType.NORMALS]);
+			FoxRenderer.setAttributePointerAt(attrib.tangent, mesh.buffers[FoxVertexBufferType.TANGENTS]);
 		}
 
-		if(attrib.color != -1) context.setVertexBufferAt(attrib.color, mesh.colorBuffer, 0);
+		if(attrib.color != -1)
+			FoxRenderer.setAttributePointerAt(attrib.color, mesh.buffers[FoxVertexBufferType.COLORS]);
 
-		// Skinning
-		if(attrib.boneWeight != -1) context.setVertexBufferAt(attrib.boneWeight, mesh.boneWeights, 0);
-		if(attrib.boneIndex != -1) switch(mesh.boneIndices?.__stride ?? -1) {
-			case 4: FoxRenderer.vertexAtrribPtrUByte(context, attrib.boneIndex, mesh.boneIndices); // Unsigned Byte
-			case 8: FoxRenderer.vertexAtrribPtrUShort(context, attrib.boneIndex, mesh.boneIndices); // Unsigned Short
-			default: {
-				GL.disableVertexAttribArray(attrib.boneIndex);
-				context.__bindGLArrayBuffer(null);
-			}
-		}
+		if(attrib.boneWeight != -1)
+			FoxRenderer.setAttributePointerAt(attrib.boneWeight, mesh.buffers[FoxVertexBufferType.WEIGHTS]);
+
+		if(attrib.boneIndex != -1)
+			FoxRenderer.setAttributePointerAt(attrib.boneIndex, mesh.buffers[FoxVertexBufferType.BONE_INDICES]);
 
 		// Instance data
 		var ID = attrib.instanceData;
 		
 		if(ID.data0 != -1) {
-			context.setVertexBufferAt(ID.data0, instanceData.column0.glBuffer, 0);
+			FoxRenderer.setAttributePointerAt(ID.data0, instanceData.column0.glBuffer);
 			GL.vertexAttribDivisor(ID.data0, 1);
 
-			context.setVertexBufferAt(ID.data1, instanceData.column1.glBuffer, 0);
+			FoxRenderer.setAttributePointerAt(ID.data1, instanceData.column1.glBuffer);
 			GL.vertexAttribDivisor(ID.data1, 1);
 
-			context.setVertexBufferAt(ID.data2, instanceData.column2.glBuffer, 0);
+			FoxRenderer.setAttributePointerAt(ID.data2, instanceData.column2.glBuffer);
 			GL.vertexAttribDivisor(ID.data2, 1);
 		}
 		
 		if(ID.color != -1) {
-			context.setVertexBufferAt(ID.color, instanceData.color.glBuffer, 0);
+			FoxRenderer.setAttributePointerAt(ID.color, instanceData.color.glBuffer);
 			GL.vertexAttribDivisor(ID.color, 1);
 		}
 
 		// Draw things the OpenGL way
 		@:privateAccess // Shut up haxe everything is okay
-		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.indexBuffer.__id);
-		GL.drawElementsInstanced(FoxRenderer.renderMode, elements, gl.UNSIGNED_SHORT, 0, count);
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer.id);
+		GL.drawElementsInstanced(FoxRenderer.renderMode, elements, indexBuffer.type, 0, count);
 		
 		// Restore state, else everything will be void
 		
@@ -1031,40 +1040,15 @@ class FoxRenderer {
 		}
 	}
 
-	public static function updateVertexBuffer(context:Context3D, buffer:VertexBuffer3D, data:Float32Array, offset:Int=0) {
-		var gl = context.gl;
-		offset *= 4;
-		context.__bindGLArrayBuffer(buffer.__id);
-		#if foxlite_polymod
-		#if lime_webgl
-		GL.bufferSubDataWEBGL(gl.ARRAY_BUFFER, offset, data);
-		#else
-		GL.bufferSubData(gl.ARRAY_BUFFER, offset, data.length*4, DataPointer.fromArrayBufferView(data));
-		#end
-		#else
-		gl.bufferSubData(gl.ARRAY_BUFFER, offset, data);
-		#end
-	}
-
-	public static function vertexAtrribPtrUByte(context:Context3D, index:Int, buffer:VertexBuffer3D, bufferOffet:Int=0) {
+	public static function setAttributePointerAt(index:Int, buffer:FoxVertexBuffer, bufferOffset:Int=0) {
+		if(index < 0) return;
 		if(buffer == null) {
 			GL.disableVertexAttribArray(index);
 			context.__bindGLArrayBuffer(null);
 			return;
 		}
-		context.__bindGLArrayBuffer(buffer.__id);
-		GL.enableVertexAttribArray(index); //  		     	       vvvvv literally just fixing this
-		GL.vertexAttribPointer(index, 4, context.gl.UNSIGNED_BYTE, false, buffer.__stride, bufferOffet);
-	}
-
-	public static function vertexAtrribPtrUShort(context:Context3D, index:Int, buffer:VertexBuffer3D, bufferOffet:Int=0) {
-		if(buffer == null) {
-			GL.disableVertexAttribArray(index);
-			context.__bindGLArrayBuffer(null);
-			return;
-		}
-		context.__bindGLArrayBuffer(buffer.__id);
+		context.__bindGLArrayBuffer(buffer.id);
 		GL.enableVertexAttribArray(index);
-		GL.vertexAttribPointer(index, 4, context.gl.UNSIGNED_SHORT, false, buffer.__stride, bufferOffet);
+		GL.vertexAttribPointer(index, buffer.components, buffer.type, buffer.normalized, buffer.stride, bufferOffset);
 	}
 }

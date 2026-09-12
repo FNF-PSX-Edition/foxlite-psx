@@ -1,7 +1,7 @@
 package foxlite.flixel;
 
 import StringTools;
-#if polymod
+#if (funkin && polymod)
 import funkin.modding.base.ScriptedFlxSpriteGroup;
 #else
 import flixel.group.FlxSpriteGroup;
@@ -10,7 +10,7 @@ import flixel.text.FlxText;
 import foxlite.renderer.FoxRenderer;
 import haxe.Timer;
 
-class FoxRenderMetrics extends #if polymod ScriptedFlxSpriteGroup #else FlxSpriteGroup #end {
+class FoxRenderMetrics extends #if (funkin && polymod) ScriptedFlxSpriteGroup #else FlxSpriteGroup #end {
 
 	public var template = StringTools.replace('
 	-- FoxLite $0 --
