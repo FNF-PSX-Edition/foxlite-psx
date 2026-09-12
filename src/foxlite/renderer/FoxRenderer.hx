@@ -52,7 +52,7 @@ typedef FoxGLExtensions = {
 class FoxRenderer {
 
 	public static final BUILD_NAME = "Beta";
-	public static final VERSION = "0.2.0";
+	public static final VERSION = "0.2.1";
 
 	public static var frameCount:Int = 0;
 	public static var drawCalls:Int = 0;
