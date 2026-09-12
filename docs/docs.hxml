@@ -10,5 +10,6 @@
 --define FLX_NO_KEYBOARD
 --define FLX_NO_MOUSE
 --define FLX_NO_TOUCH
+--define FLX_PITCH
 --define FLX_STANDARD_ASSETS_DIRECTORY
 foxlite
