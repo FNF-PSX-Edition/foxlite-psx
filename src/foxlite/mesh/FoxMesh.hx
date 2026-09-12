@@ -99,7 +99,7 @@ class FoxMesh {
 		FoxRenderer.allocationsThisFrame += 1;
 	}
 
-	public function setIndexBufferRaw(data:UInt16Array) {
+	public function setIndexBufferRaw(data:ArrayBufferView) {
 		buffers[FoxVertexBufferType.INDICES]?.uploadFromTypedArray(data);
 	}
 
