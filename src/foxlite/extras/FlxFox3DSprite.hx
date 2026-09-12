@@ -9,11 +9,16 @@ import flixel.FlxSprite;
 
 	Use it when you need flixel sprites rendered in flixel to have a 3D perspective
 
+	__Note:__ The projection aspect ratio depends on the scene's width and height, this can be
+	adjusted using the camera's `aspect` property
+
+	__Note 2:__ `FoxOfflineScene` will not work for this at the moment
+
 	```haxe
 	var sprite3D = new FlxFox3DSprite(yourSprite, new YourShader("foxlite/flixel_sprite"));
 	
 	// Once added, the sprite will be positioned and transformed at `sprite3D`
-	offlineScene.add(transformable);
+	scene.add(sprite3D);
 	```
 **/
 class FlxFox3DSprite extends FoxObject {
