@@ -50,6 +50,11 @@ class FoxCamera extends FoxObject {
 	public var __invProjectionMatrix:Matrix3D = new Matrix3D(); // For raytracing effects
 
 	/**
+		Origin of the screen to where a perspective or isometric view would rotate
+	**/
+	public var projectionOrigin:FlxPoint = FlxPoint.get(0, 0);
+
+	/**
 		This is the view matrix from a previous frame, used for motion vector calculations
 	**/
 	public var __prevViewMatrix:Matrix3D = new Matrix3D();
@@ -94,7 +99,8 @@ class FoxCamera extends FoxObject {
 		if(FoxRenderer.calculateMotionVectors) __prevViewMatrix.copyRawDataFrom(viewMatrix.rawData);
 		FoxMathUtil.viewMatrixFromTransform(viewMatrix, transform);
 
-		if(__updateProjection) {
+		var hasOffset = !projectionOrigin.isZero();
+		if(__updateProjection || hasOffset) {
 			__aspect = scene != null ? scene.__width / scene.__height : 1;
 			__aspect *= aspect;
 			
@@ -104,7 +110,25 @@ class FoxCamera extends FoxObject {
 			else {
 				FoxMathUtil.orthogonalMatrix(projectionMatrix, fov, __aspect, near, far);
 			}
-			
+
+			if(hasOffset) {
+				// shift like blender does
+				var sx = projectionOrigin.x;
+				var sy = projectionOrigin.y;
+
+				if(__aspect >= 1) sy *= __aspect;
+				else sx /= __aspect;
+				
+				if(!orthogonal) {
+					projectionMatrix.rawData.__array[8] = sx * 2;
+					projectionMatrix.rawData.__array[9] = sy * 2;
+				}
+				else {
+					projectionMatrix.rawData.__array[12] = sx * 2;
+					projectionMatrix.rawData.__array[13] = sy * 2;
+				}
+			}
+
 			__updateProjection = false;
 		}
 

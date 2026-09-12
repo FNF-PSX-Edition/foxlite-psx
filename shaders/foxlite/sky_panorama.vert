@@ -10,9 +10,8 @@ void main(void) {
 	// check utils.inc for the functions for this
 	vec3 ndc = screenToNDC(foxlite_TexCoord);
 	vec4 view = ndcToView(ndc);
-	view.y *= -1.0;
 	
 	worldDirection = viewToWorld(view);
 
-    gl_Position = vec4(foxlite_Position.xy, -1.0, 1.0);
+    gl_Position = vec4(foxlite_Position.x, -foxlite_Position.y, -1.0, 1.0);
 }
