@@ -1,6 +1,6 @@
 package foxlite.flixel;
 
-#if polymod
+#if (funkin && polymod)
 import funkin.modding.base.ScriptedFlxBasic;
 class FoxExtendableBasic extends ScriptedFlxBasic {}
 #else
