@@ -13,7 +13,6 @@ import foxlite.renderer.FoxRenderer;
 import lime.math.Vector2;
 import lime.utils.ArrayBufferView;
 import openfl.display3D.Context3D;
-import openfl.display3D.IndexBuffer3D;
 import openfl.geom.Vector3D;
 #if foxlite_polymod
 import lime.graphics.opengl.GL;

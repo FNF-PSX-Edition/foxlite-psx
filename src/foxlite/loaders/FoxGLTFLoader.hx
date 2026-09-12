@@ -54,7 +54,6 @@ import openfl.geom.Vector3D;
 import openfl.geom.Matrix3D;
 import openfl.utils.ByteArray;
 import openfl.display.BitmapData;
-import openfl.display3D.IndexBuffer3D;
 import openfl.display3D.textures.Texture;
 
 @dox(hide)
