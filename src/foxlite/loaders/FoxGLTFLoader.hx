@@ -472,12 +472,12 @@ class FoxGLTFLoader {
 						}
 
 						var dataArray:ArrayBufferView = switch(accessor.componentType:Int) {
-							case AccessorComponentType.BYTE: new Int8Array(count);
-							case AccessorComponentType.UNSIGNED_BYTE: new UInt8ClampedArray(count);
-							case AccessorComponentType.SHORT: new Int16Array(count);
-							case AccessorComponentType.UNSIGNED_SHORT: new UInt16Array(count);
-							case AccessorComponentType.UNSIGNED_INT: new UInt32Array(count);
-							case AccessorComponentType.FLOAT: new Float32Array(count);
+							case AccessorComponentType.BYTE: new Int8Array(#if js count #else null, buffer #end);
+							case AccessorComponentType.UNSIGNED_BYTE: new UInt8ClampedArray(#if js count #else null, buffer #end);
+							case AccessorComponentType.SHORT: new Int16Array(#if js count #else null, buffer #end);
+							case AccessorComponentType.UNSIGNED_SHORT: new UInt16Array(#if js count #else null, buffer #end);
+							case AccessorComponentType.UNSIGNED_INT: new UInt32Array(#if js count #else null, buffer #end);
+							case AccessorComponentType.FLOAT: new Float32Array(#if js count #else null, buffer #end);
 							default: null;
 						}
 
@@ -491,13 +491,19 @@ class FoxGLTFLoader {
 
 						// Write data
 						#if js
+
 						var blitBuffer:Bytes = Bytes.ofData(dataArray.buffer);
+						if(buffer != null) blitBuffer.blit(0, buffer, (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0), dataArray.byteLength);
+
 						#else
-						var blitBuffer:Bytes = dataArray.buffer;
+
+						// Native doesn't need blitting, we can just use the buffer pointer
+						dataArray.byteLength = count * stride;
+						dataArray.length = count;
+						dataArray.byteOffset = (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
+						
 						#end
 
-						if(buffer != null) blitBuffer.blit(0, buffer, (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0), dataArray.byteLength);
-						
 						if(accessor.sparse != null) {
 							trace('Sparse not implemented yet.');
 						}
@@ -547,24 +553,31 @@ class FoxGLTFLoader {
 			var tempVectors = tempMatrix.decompose().__array;
 			#end
 			for(skin in (gltfJson.skins:Array<Dynamic>)) {
-				var accessor:Dynamic = accessors[skin.inverseBindMatrices];
-				var view:Dynamic = bufferViews[accessor.bufferView];
-				var buffer:ByteArray = buffers[view.buffer];
-				if(buffer == null) {
-					trace('Warning! Buffer ${view.buffer} not found for skin ${skin.name}, skipping!');
-					break;
+				var accessor:Dynamic = null;
+				var view:Dynamic = null;
+				var buffer:ByteArray = null;
+
+				var inverseMat:Matrix3D = null;
+
+				// inverseBindMatrices can be optional
+				if(skin.inverseBindMatrices != null) {
+					accessor = accessors[skin.inverseBindMatrices];
+					view = bufferViews[accessor.bufferView];
+					buffer = buffers[view.buffer];
 				}
+				else inverseMat = new Matrix3D();
 
 				var skinData = new FoxSkinData();
 
 				var gltfJoints:Array<Int> = skin.joints;
 				for(idx=>joint in gltfJoints) {
-					var inverseMat = new Matrix3D();
-
-					var a = inverseMat.rawData.__array;
-					for(i in 0...16) {
-						buffer.position = view.byteOffset + (i+idx*16)*4;
-						a[i] = buffer.readFloat();
+					if(skin.inverseBindMatrices != null) {
+						inverseMat = new Matrix3D();
+						var a = inverseMat.rawData.__array;
+						for(i in 0...16) {
+							buffer.position = view.byteOffset + (i+idx*16)*4;
+							a[i] = buffer.readFloat();
+						}
 					}
 					var bone = new FoxBone(inverseMat);
 					var node:Dynamic = nodes[joint];
