@@ -177,7 +177,6 @@ class FoxCamera extends FoxObject {
 	public override function destroy() {
 		transform = null;
 		projectionMatrix = null;
-		projectionOrigin.put();
 		lightData?.destroy();
 		projectionOrigin?.put();
 		projectionOrigin = null;
