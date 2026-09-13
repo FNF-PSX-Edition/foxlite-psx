@@ -3,6 +3,7 @@ package foxlite.renderer;
 import EReg;
 import Reflect;
 import StringTools;
+import StringBuf;
 import haxe.ds.StringMap;
 import foxlite.FoxCache;
 import foxlite.FoxShader;
@@ -45,7 +46,8 @@ typedef FoxGLExtensions = {
 	?depthTexture:Dynamic,
 	?textureFloat:Dynamic,
 	?textureHalfFloat:Dynamic,
-	?elementIndexUint:Dynamic // WebGL 1
+	?elementIndexUint:Dynamic, // WebGL 1
+	?instancedArrays:Dynamic // WebGL 1 / ES 2
 };
 
 // TODO: Make this a singleton so we don't use this many static vars
@@ -161,7 +163,7 @@ class FoxRenderer {
 		
 		FoxRenderer.renderContext = '${window.context.type}'.toUpperCase();
 		FoxRenderer.glDeviceName = gl.getParameter(gl.RENDERER);
-		trace('[FoxLite > FoxRenderer]: lime is ${renderContext}:\n    - Shader model: ${GL.getParameter(context.gl.SHADING_LANGUAGE_VERSION)}\n    - Device: $glDeviceName');
+		trace('[FoxLite > FoxRenderer]: lime is ${renderContext} (${Std.string(GL.context)}):\n    - Shader model: ${GL.getParameter(context.gl.SHADING_LANGUAGE_VERSION)}\n    - Device: $glDeviceName');
 	
 		// Activate extensions
 		extensions.drawBuffersEXT = GL.getExtension("ARB_draw_buffers")
@@ -188,7 +190,19 @@ class FoxRenderer {
 
 		extensions.elementIndexUint = GL.getExtension("OES_element_index_uint");
 
+		extensions.instancedArrays = GL.getExtension("EXT_instanced_arrays")
+								  ?? GL.getExtension("ARB_instanced_arrays")
+								  ?? GL.getExtension("ANGLE_instanced_arrays");
+
 		trace('[FoxLite > FoxRenderer]: Texture Anisotropy ${extensions.anisotropic == null ?  "not" : "is"} supported.');
+
+		var extTxt = new StringBuf();
+		extTxt.add("Active Extensions: ");
+		for(extName in Reflect.fields(extensions)) {
+			var ext = Reflect.field(extensions, extName);
+			if(ext != null) extTxt.add('${Std.string(ext)}  ');
+		}
+		trace(extTxt.toString());
 
 		// Initialize missing texture
 		MISSING_TEXTURE = FoxTexture.create(2, 2, "rgba", "UNSIGNED_SHORT_4_4_4_4");
