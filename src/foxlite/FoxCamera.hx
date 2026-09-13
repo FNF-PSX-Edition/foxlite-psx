@@ -55,6 +55,8 @@ class FoxCamera extends FoxObject {
 	**/
 	public var projectionOrigin:FlxPoint = FlxPoint.get(0, 0);
 
+	var __lastProjectionOrigin:FlxPoint = FlxPoint.get(0, 0);
+
 	/**
 		This is the view matrix from a previous frame, used for motion vector calculations
 	**/
@@ -117,8 +119,8 @@ class FoxCamera extends FoxObject {
 			__invSkyViewData[i] = __invSkyViewMatrix.rawData[i];
 		}
 
-		var hasOffset = !projectionOrigin.isZero();
-		if(__updateProjection || hasOffset) {
+		var updateOffset = !projectionOrigin.equals(__lastProjectionOrigin);
+		if(__updateProjection || updateOffset) {
 			__aspect = scene != null ? scene.__width / scene.__height : 1;
 			__aspect *= aspect;
 			
@@ -129,7 +131,7 @@ class FoxCamera extends FoxObject {
 				FoxMathUtil.orthogonalMatrix(projectionMatrix, fov, __aspect, near, far);
 			}
 
-			if(hasOffset) {
+			if(!projectionOrigin.isZero()) {
 				// shift like blender does
 				var sx = projectionOrigin.x;
 				var sy = projectionOrigin.y;
@@ -146,6 +148,8 @@ class FoxCamera extends FoxObject {
 					projectionMatrix.rawData.__array[13] = sy * 2;
 				}
 			}
+			if (updateOffset)
+				__lastProjectionOrigin.copyFrom(projectionOrigin);
 
 			__updateProjection = false;
 		}
@@ -193,6 +197,10 @@ class FoxCamera extends FoxObject {
 		projectionMatrix = null;
 		__invSkyViewMatrix = null;
 		lightData?.destroy();
+		projectionOrigin?.put();
+		projectionOrigin = null;
+		__lastProjectionOrigin?.put();
+		__lastProjectionOrigin = null;
 		super.destroy();
 	}
 

@@ -43,7 +43,7 @@ class FoxInstancedModel extends FoxModel {
 	public var __instanceUpdates:List<Int> = new List();
 	
 	public var __instanceMinChunk:UInt = 0xFEDE10B0;
-	public var __instanceMaxChunk:UInt = -1;
+	public var __instanceMaxChunk:Int = -1;
 
 	public var __instanceBufferDirty:Bool = false;
 

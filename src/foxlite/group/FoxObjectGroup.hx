@@ -3,6 +3,7 @@ package foxlite.group;
 import foxlite.FoxObject;
 import foxlite.flixel.FlxTypedSignalImpl;
 import foxlite.renderer.FoxRenderer;
+import foxlite.culling.BoundingBox;
 
 /**
 	This group accepts `FoxObject` exclusively for parent transform
@@ -132,6 +133,16 @@ class FoxObjectGroup extends FoxObject {
 
 	public override function pushDrawData(scene:FoxScene) {
 		for(m in members) if(m != null && m.visible) m.pushDrawData(scene);
+	}
+
+	/**
+		Gets the expanded combined bounding box of all objects inside this group
+
+		@param output the Bounding Box where to store the result
+	**/
+	public override function computeBounds(output:BoundingBox):Void {
+		super.computeBounds(output);
+		for(m in members) if(m != null && m.visible) m.computeBounds(output);
 	}
 
 	public override function destroy() {

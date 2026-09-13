@@ -4,6 +4,7 @@ import foxlite.FoxCamera;
 import foxlite.FoxScene;
 import foxlite.group.FoxGroup;
 import foxlite.animation.FoxAnimationPlayer;
+import foxlite.culling.BoundingBox;
 
 class FoxBasic {
 	
@@ -41,6 +42,16 @@ class FoxBasic {
 		Note: Internal use only, it is a performance critical operation, keep it fast.
 	**/
 	public function pushDrawData(scene:FoxScene) {}
+
+	/**
+		Gets the bounding box of all meshes and models inside groups
+
+		In `FoxBasic` this is just a template, do the actual implementation in
+		your models and groups
+
+		@param output the Bounding Box where to store the result
+	**/
+	public function computeBounds(output:BoundingBox):Void {}
 
 	public function destroy() {
 		if(scene != null && !__destroyed) scene.remove(this);

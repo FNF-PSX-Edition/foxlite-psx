@@ -1,12 +1,14 @@
 package foxlite.loaders;
 
-import foxlite.renderer.FoxRenderer;
+import foxlite.culling.BoundingBox;
 import StringTools;
+import haxe.ds.StringMap;
 import foxlite.FoxCache;
 import foxlite.loaders.FoxLoaderUtil;
 import foxlite.material.FoxMaterial;
+import foxlite.renderer.FoxRenderer;
 import foxlite.mesh.FoxMesh;
-import haxe.ds.StringMap;
+import openfl.geom.Vector3D;
 
 class FoxOBJLoader {
 
@@ -79,9 +81,12 @@ class FoxOBJLoader {
 		var materials:Map<String, FoxMaterial> = new StringMap();
 		var matPath:String = null; // But it's just a theory
 
+		var minVertex:Vector3D = new Vector3D(1e7, 1e7, 1e7);
+		var maxVertex:Vector3D = new Vector3D(-1e7, -1e7, -1e7);
+
 		function finishMesh() {
 			curMesh?.setArrays(vertices, uvtData, indices, null, normals, colors, null, null, bigIndices);
-			curMesh?.calculateBounds(vertices);
+			if(curMesh != null) curMesh.bounds = new BoundingBox(minVertex, maxVertex);
 			if(curMesh != null && curMesh.material == null) curMesh.material = FoxRenderer.MISSING_MATERIAL; // What happened to our material...
 					
 			curMesh = new FoxMesh();
@@ -97,6 +102,9 @@ class FoxOBJLoader {
 			uniqueIDs.clear();
 			curIndex = 0;
 			bigIndices = false;
+
+			minVertex.setTo(1e7, 1e7, 1e7);
+			maxVertex.setTo(-1e7, -1e7, -1e7);
 
 			vertexOffset = vertexCount;
 			textureOffset = textureCount;
@@ -181,9 +189,19 @@ class FoxOBJLoader {
 						
 						var f0 = Std.parseInt(fmt[0]) - 1;
 						var v = (f0 - vertexOffset) * 3;
-						vertices.push(verticesRaw[v  ]);
-						vertices.push(verticesRaw[v+1]);
-						vertices.push(verticesRaw[v+2]);
+
+						var vx = verticesRaw[v], vy = verticesRaw[v+1], vz = verticesRaw[v+2];
+						vertices.push(vx);
+						vertices.push(vy);
+						vertices.push(vz);
+
+						minVertex.x = Math.min(minVertex.x, vx);
+						minVertex.y = Math.min(minVertex.y, vy);
+						minVertex.z = Math.min(minVertex.z, vz);
+
+						maxVertex.x = Math.max(maxVertex.x, vx);
+						maxVertex.y = Math.max(maxVertex.y, vy);
+						maxVertex.z = Math.max(maxVertex.z, vz);
 
 						if(colorCount > 0) {
 							var c = (f0 - colorOffset) * 3;
@@ -229,7 +247,7 @@ class FoxOBJLoader {
 		// EOF reached
 		// Finish pending mesh
 		curMesh?.setArrays(vertices, uvtData, indices, null, normals, colors, null, null, bigIndices);
-		curMesh?.calculateBounds(vertices);
+		if(curMesh != null) curMesh.bounds = new BoundingBox(minVertex, maxVertex);
 		if(curMesh != null && curMesh.material == null) curMesh.material = FoxRenderer.MISSING_MATERIAL; // What happened to our material...
 
 		FoxCache.meshes().set(name, meshes);

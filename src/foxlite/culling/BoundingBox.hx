@@ -10,7 +10,8 @@ class BoundingBox {
 	public var center:Vector3D = new Vector3D();
 	public var extents:Vector3D = new Vector3D();
 
-	public function new():Void {
+	public function new(?min:Vector3D, ?max:Vector3D):Void {
+		if(min != null && max != null) fromExtents(min, max);
 		FoxRenderer.allocationsThisFrame += 3;
 	}
 
@@ -28,15 +29,32 @@ class BoundingBox {
 		return this;
 	}
 
+	/**
+		This merges two bounding boxes so they expand to cover their total volume
+
+		This also moves the bounding box so the extents can be applied to the new volume
+	**/
 	public function expand(box:BoundingBox) {
-		var isZero = extents.equals(FoxMathUtil.ZERO);
-		center.incrementBy(box.center);
-		extents.incrementBy(box.extents);
+		if(extents.equals(FoxMathUtil.ZERO)) {
+			extents.copyFrom(box.extents);
+			center.copyFrom(box.center);
+			return;
+		}
+		final min = FoxMathUtil.__tempVector;
+		final max = FoxMathUtil.__tempVector2;
 
-		if(isZero) return;
+		min.setTo(
+			Math.min(center.x - extents.x, box.center.x - box.extents.x),
+			Math.min(center.y - extents.y, box.center.y - box.extents.y),
+			Math.min(center.z - extents.z, box.center.z - box.extents.z)
+		);
+		max.setTo(
+			Math.max(center.x + extents.x, box.center.x + box.extents.x),
+			Math.max(center.y + extents.y, box.center.y + box.extents.y),
+			Math.max(center.z + extents.z, box.center.z + box.extents.z)
+		);
 
-		center.scaleBy(0.5);
-		extents.scaleBy(0.5);
+		fromExtents(min, max);
 	}
 
 	public function zero() {
@@ -53,7 +71,10 @@ class BoundingBox {
 		@param output (Optional) Where to store the transformed result, if empty, a new `BoundingBox` will be created
 	**/
 	public function getTransformed(transform:Matrix3D, ?output:BoundingBox):BoundingBox {
-		if(output == null) output = new BoundingBox();
+		if(output == null) {
+			output = new BoundingBox();
+			FoxRenderer.allocationsThisFrame += 1;
+		}
 
 		// Translate to global position
 		transform.transformVectorToOutput(center, output.center);
