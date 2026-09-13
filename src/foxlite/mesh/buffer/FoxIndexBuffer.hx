@@ -18,7 +18,7 @@ class FoxIndexBuffer extends FoxVertexBuffer {
 		#if lime_webgl
 		GL.bufferSubDataWEBGL(gl.ELEMENT_ARRAY_BUFFER, byteOffset, data);
 		#else
-		GL.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, byteOffset, data.length, DataPointer.fromArrayBufferView(data));
+		GL.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, byteOffset, data.length*bytesPerElement, DataPointer.fromArrayBufferView(data));
 		#end
 		#else
 		gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, byteOffset, data);
