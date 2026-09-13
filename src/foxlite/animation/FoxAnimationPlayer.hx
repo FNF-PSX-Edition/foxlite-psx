@@ -165,6 +165,7 @@ class FoxAnimationPlayer extends FoxAnimationLinker {
 			if(track.type == FoxTrackType.FUNCTION && (frameChanged || continuousCall)) {
 				// For function track types we only need to call it
 				var arg:Array<Dynamic> = v0;
+				if(arg == null) continue;
 				var func = (cast track:FoxCallbackTrack).callbacks.get(arg[0]);
 				if(func != null) Reflect.callMethod(null, func, arg[1]);
 				else trace('Could not call "${arg[0]}"! For track "$trackName"');
