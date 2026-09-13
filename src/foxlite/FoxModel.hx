@@ -12,6 +12,7 @@ import foxlite.renderer.FoxRenderer;
 import foxlite.skin.FoxSkinData;
 import openfl.display3D.Context3D;
 import openfl.geom.Matrix3D;
+import foxlite.culling.BoundingBox;
 
 class FoxModel extends FoxObject {
 
@@ -215,6 +216,18 @@ class FoxModel extends FoxObject {
 		if(data == null) return null;
 		meshes = data.meshes;
 		return data;
+	}
+
+	/**
+		Gets the expanded combined bounding box of all meshes inside this model
+
+		@param output the Bounding Box where to store the result
+	**/
+	public override function computeBounds(output:BoundingBox):Void {
+		super.computeBounds(output);
+		for(mesh in meshes) if(mesh?.bounds != null) output.expand(mesh.bounds);
+		output.extents.scaleBy(cullMargin);
+		output.getTransformed(transform, output);
 	}
 
 	public override function destroy() {
