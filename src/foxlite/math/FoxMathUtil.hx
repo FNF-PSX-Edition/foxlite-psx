@@ -217,8 +217,28 @@ class FoxMathUtil {
 		return basisMatrix(new Matrix3D(), rotEuler);
 	}
 
+	/**
+		Allocationless identity matrix (OpenFL allocates a new Vector)
+	**/
 	public inline static function fastIdentity(matrix:Matrix3D) {
 		matrix.copyRawDataFrom(MATRIX_IDENTITY);
+	}
+
+	/**
+		Allocationless transpose (OpenFL copies the whole Vector)
+	**/
+	public static function fastTranspose(matrix:Matrix3D):Matrix3D {
+		final a = matrix.rawData.__array;
+		var m1:Float = a[1], m2:Float = a[2], m3:Float = a[3],
+			m4:Float = a[4], m6:Float = a[6], m7:Float = a[7],
+			m8:Float = a[8], m9:Float = a[9], m11:Float = a[11],
+			m12:Float = a[12], m13:Float = a[13], m14:Float = a[14];
+		
+		a[1] = m4; a[2] = m8; a[3] = m12;
+		a[4] = m1; a[6] = m9; a[7] = m13;
+		a[8] = m2; a[9] = m6; a[11] = m14;
+		a[12] = m3; a[13] = m7; a[14] = m11;
+		return matrix;
 	}
 
 	/**
