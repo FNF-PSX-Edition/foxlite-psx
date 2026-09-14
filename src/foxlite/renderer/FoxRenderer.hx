@@ -317,6 +317,7 @@ class FoxRenderer {
 		FoxShader.staticInit();
 		#if foxlite_polymod
 		trace(BoundingBox.__tempBounds);
+		trace(BoundingBox.__tempBounds2);
 		#end
 	}
 

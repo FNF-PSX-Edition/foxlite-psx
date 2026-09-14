@@ -9,6 +9,7 @@ class BoundingBox {
 
 	// Temporary bounds for calculations
 	public static var __tempBounds:BoundingBox = new BoundingBox();
+	public static var __tempBounds2:BoundingBox = new BoundingBox();
 	
 	public var center:Vector3D = new Vector3D();
 	public var extents:Vector3D = new Vector3D();

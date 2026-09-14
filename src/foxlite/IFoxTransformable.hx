@@ -1,7 +1,8 @@
 package foxlite;
 
 // Interface for transformable classes
-// Probably won't add it due to HScript incompatibility
+// Probably won't add it due to HScript incompatibility´
+// For future implementation: Used in FoxObject
 /*
 import openfl.geom.Matrix3D;
 import openfl.geom.Vector3D;

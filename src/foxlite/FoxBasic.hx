@@ -53,6 +53,25 @@ class FoxBasic {
 	**/
 	public function computeBounds(output:BoundingBox):Void {}
 
+	/**
+		Performs frustum culling by checking the bounding box against a camera frustum
+	**/
+	public function testAndCull(camera:FoxCamera):Void {}
+
+	/**
+		Template function that returns the final visibility for the basic. Frustum culling can affect this.
+	**/
+	public function isVisible():Bool {
+		return visible;
+	}
+
+	/**
+		Template function that returns the final activated state for the basic. Frustum culling can affect this.
+	**/
+	public function isActive():Bool {
+		return active;
+	}
+
 	public function destroy() {
 		if(scene != null && !__destroyed) scene.remove(this);
 		__destroyed = true;

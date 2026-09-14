@@ -22,9 +22,10 @@ class FoxObjectGroup extends FoxObject {
 
 	public var length(get, never):Int;
 
-	public function new() {
-		super();
-		name = "FoxGroup";
+	public function new(x:Float=0, y:Float=0, z:Float=0, culling:Bool=true) {
+		super(x, y, z);
+		//frustumCulling = culling;
+		name = "FoxObjectGroup";
 	}
 
 	public function add(member:FoxObject):FoxObject {
@@ -123,7 +124,12 @@ class FoxObjectGroup extends FoxObject {
 
 	public override function update(dt:Float) {
 		super.update(dt);
-		for(m in members) if(m != null && m.active) m.update(dt);
+		var removals:Array<FoxObject> = [];
+		for(m in members) if(m != null && m.isActive()) {
+			m.update(dt);
+			if(m.__destroyed) removals.push(m);
+		}
+		for(r in removals) remove(r);
 	}
 
 	public override function draw(camera:FoxCamera) {
@@ -132,7 +138,7 @@ class FoxObjectGroup extends FoxObject {
 	}
 
 	public override function pushDrawData(scene:FoxScene) {
-		for(m in members) if(m != null && m.visible) m.pushDrawData(scene);
+		for(m in members) if(m != null && m.isVisible()) m.pushDrawData(scene);
 	}
 
 	/**

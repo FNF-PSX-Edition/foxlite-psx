@@ -14,22 +14,38 @@ import openfl.display3D.Context3D;
 import openfl.geom.Matrix3D;
 import foxlite.culling.BoundingBox;
 
-class FoxModel extends FoxObject {
+class FoxModel extends FoxObject #if !foxlite_polymod implements IFoxCullable #end {
 
 	public var layers:FoxLayer;
 
+	public var context:Context3D;
+
+	//// IFoxCullable
 	/**
 		If enabled, this will perform frustum culling, meaning this object will disable its rendering when it's not
 		visible by the camera. If you have many many objects on-screen that shouldn't be visible off-screen,
 		keep this enabled
 	**/
 	public var frustumCulling:Bool;
+
+	/**
+		If true, this object will not call `update()`. Keep in mind this will disable
+		any logic you've put here if extending this class.
+	**/
+	public var deactivateWhenCulled:Bool = false;
+
 	/**
 		The scale for the meshes extents, increase this if your object gets culled too early
 	**/
 	public var cullMargin:Float = 1;
 
-	public var context:Context3D;
+	/**
+		This value is set per-camera at draw time, indicating if the model has been culled
+
+		To disable these calculations, set `frustumCulling` to disabled
+	**/
+	public var culled:Bool = false;
+	////
 
 	/**
 		This is the object's transform from a previous frame, used for motion vector calculations.
@@ -140,6 +156,14 @@ class FoxModel extends FoxObject {
 		}
 	}
 
+	public override function isVisible():Bool {
+		return super.isVisible() && !culled;
+	}
+
+	public override function isActive():Bool {
+		return super.isActive() && !(deactivateWhenCulled && culled);
+	}
+
 	// Just a proxy to make things easier
 	public function renderMesh(mesh:FoxMesh, shader:FoxShader) {
 		if(mesh.buffers[FoxVertexBufferType.INDICES] != null) FoxRenderer.drawMesh(context, mesh, shader);
@@ -233,6 +257,34 @@ class FoxModel extends FoxObject {
 		tmpBox.extents.scaleBy(cullMargin);
 		tmpBox.getTransformed(transform, tmpBox);
 		output.expand(tmpBox);
+	}
+
+	public override function draw(camera:FoxCamera) {
+		super.draw(camera);
+		if(camera.doFrustumCulling) {
+			if(frustumCulling) testAndCull(camera);
+			else if(culled) {
+				FoxRenderer.mustRebuildDrawGroups = true;
+				culled = false;
+			}
+		}
+	}
+
+	/**
+		Performs frustum culling by checking the sorrounding bounding box against a camera frustum
+	**/
+	public override function testAndCull(camera:FoxCamera) {
+		// Check frustum culling
+		final tmpBox = BoundingBox.__tempBounds2;
+		tmpBox.zero();
+		computeBounds(tmpBox);
+		tmpBox.getTransformed(camera.viewMatrix, tmpBox); // To view space
+		
+		var test = !camera.frustumPlanes.overlapsBox(tmpBox);
+		if(test != culled) {
+			FoxRenderer.mustRebuildDrawGroups = true;
+			culled = test;
+		}
 	}
 
 	public override function destroy() {
