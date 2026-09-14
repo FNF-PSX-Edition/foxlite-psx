@@ -115,7 +115,7 @@ class FoxDirectionalSound extends FoxObject {
 		var distanceDelta:Float = (distance - prevDistance);
 		prevDistance = distance;
 
-		if(dopplerStrength != 0) sound.pitch = (dopplerPitchOffset + 1) - distanceDelta * (60*dt) * dopplerStrength;
+		if(dopplerStrength != 0) sound.pitch = (dopplerPitchOffset + 1) + getDopplerShiftStrength(distanceDelta * dopplerStrength * (60*dt));
 
 		// Dynamic sound propagation
 		if(playDistance != 0) {
@@ -135,7 +135,20 @@ class FoxDirectionalSound extends FoxObject {
 		since the last `play()` call
 	**/
 	inline function getDelayFromDistance(dist:Float) {
-    	return dist / Math.abs(propagationSpeed);
+    	return dist / propagationSpeed;
+	}
+
+	/**
+		Returns the doppler shifting strength based on the doppler formula:
+
+		f' = f0 * ( (C+V0) / (C-Vs) )
+
+		Wave speeds are converted to pitch, which is 1 for simplification
+
+		@param listenerSpeed The speed of the listener towards the sound
+	**/
+	inline function getDopplerShiftStrength(listenerSpeed:Float):Float {
+		return (1 + listenerSpeed) / (1 - propagationSpeed);
 	}
 
 	/**
