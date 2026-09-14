@@ -77,19 +77,20 @@ class FoxCamera extends FoxObject {
 		Normally, this is handled by the camera itself and the lights on the scene,
 		so you don't need to touch this unless you know what you're doing!
 	**/
-	public var lightData:FoxLightData = new FoxLightData();
+	public var lightData:FoxLightData;
 
 	/**
 		If set, this camera will use a custom environment
 	**/
 	public var environment:FoxEnvironment;
 
-	public function new(x:Float=0, y:Float=0, z:Float=0, _bgColor:FlxColor=0x0, ortho:Bool=false) {
+	public function new(x:Float=0, y:Float=0, z:Float=0, _bgColor:FlxColor=0x0, ortho:Bool=false, withLightData:Bool=true) {
 		super(x, y, z);
 		bgColor = _bgColor;
 		orthogonal = ortho;
 		name = "FoxCamera";
 		passes[0].useCameraColor = true;
+		if(withLightData) lightData = new FoxLightData();
 	}
 
 	public override function draw(camera:FoxCamera) {}
