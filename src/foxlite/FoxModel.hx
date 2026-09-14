@@ -225,9 +225,14 @@ class FoxModel extends FoxObject {
 	**/
 	public override function computeBounds(output:BoundingBox):Void {
 		super.computeBounds(output);
-		for(mesh in meshes) if(mesh?.bounds != null) output.expand(mesh.bounds);
-		output.extents.scaleBy(cullMargin);
-		output.getTransformed(transform, output);
+		// Use a temporary bounding box because what we're accumulating is not local space, but global space
+		// In the future maybe change this if transforms are separated so there's a local and a global
+		final tmpBox = BoundingBox.__tempBounds;
+		tmpBox.copyFrom(output);
+		for(mesh in meshes) if(mesh?.bounds != null) tmpBox.expand(mesh.bounds);
+		tmpBox.extents.scaleBy(cullMargin);
+		tmpBox.getTransformed(transform, tmpBox);
+		output.expand(tmpBox);
 	}
 
 	public override function destroy() {

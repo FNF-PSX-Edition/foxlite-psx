@@ -6,6 +6,9 @@ import openfl.geom.Vector3D;
 import openfl.geom.Matrix3D;
 
 class BoundingBox {
+
+	// Temporary bounds for calculations
+	public static var __tempBounds:BoundingBox = new BoundingBox();
 	
 	public var center:Vector3D = new Vector3D();
 	public var extents:Vector3D = new Vector3D();
@@ -36,8 +39,7 @@ class BoundingBox {
 	**/
 	public function expand(box:BoundingBox) {
 		if(extents.equals(FoxMathUtil.ZERO)) {
-			extents.copyFrom(box.extents);
-			center.copyFrom(box.center);
+			copyFrom(box);
 			return;
 		}
 		final min = FoxMathUtil.__tempVector;
@@ -55,6 +57,11 @@ class BoundingBox {
 		);
 
 		fromExtents(min, max);
+	}
+	
+	public inline function copyFrom(box:BoundingBox) {
+		center.copyFrom(box.center);
+		extents.copyFrom(box.extents);
 	}
 
 	public function zero() {

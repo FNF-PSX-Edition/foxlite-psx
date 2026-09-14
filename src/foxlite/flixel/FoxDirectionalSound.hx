@@ -141,7 +141,7 @@ class FoxDirectionalSound extends FoxObject {
 	/**
 		Returns the doppler shifting strength based on the doppler formula:
 
-		f' = f0 * ( (C+V0) / (C-Vs) )
+		f' = f0 * ( (C+Vo) / (C-Vs) )
 
 		Wave speeds are converted to pitch, which is 1 for simplification
 
