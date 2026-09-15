@@ -48,6 +48,16 @@ class FoxModel extends FoxObject #if !foxlite_polymod implements IFoxCullable #e
 	////
 
 	/**
+		Precalculated bounds for all meshes of this model
+
+		Updates when a mesh is added/removed
+
+		__Note:__ Vertex data updated manually are not accounted for this,
+		you'd have to rebuild the mesh bounds via `fromExtents()`
+	**/
+	public var cacheBounds:BoundingBox = new BoundingBox();
+
+	/**
 		This is the object's transform from a previous frame, used for motion vector calculations.
 		
 		Having to calculate previous transforms on empty objects is a bit pointless, so that's why this is here.
@@ -95,6 +105,7 @@ class FoxModel extends FoxObject #if !foxlite_polymod implements IFoxCullable #e
 
 	private function set_meshes(v:Array<FoxMesh>) {
 		this.meshes = v;
+		if(v != null) buildMeshBoundsCache();
 		FoxRenderer.mustRebuildDrawGroups = true;
 		return v;
 	}
@@ -174,22 +185,27 @@ class FoxModel extends FoxObject #if !foxlite_polymod implements IFoxCullable #e
 	}
 
 	public inline function addMesh(mesh:FoxMesh) {
-		meshes.push(mesh);
-		FoxRenderer.mustRebuildDrawGroups = true;
+		if(mesh != null) {
+			meshes.push(mesh);
+			cacheBounds.expand(mesh.bounds);
+			FoxRenderer.mustRebuildDrawGroups = true;
+		}
 	}
 
 	public inline function setMeshAt(index:Int, mesh:FoxMesh) {
 		meshes[index] = mesh;
+		buildMeshBoundsCache();
 		FoxRenderer.mustRebuildDrawGroups = true;
 	}
 
 	public inline function removeMesh(mesh:FoxMesh) {
-		FoxRenderer.mustRebuildDrawGroups = meshes.remove(mesh);
+		if((FoxRenderer.mustRebuildDrawGroups = meshes.remove(mesh))) buildMeshBoundsCache();
 	}
 
 	public inline function removeMeshByIndex(index:Int) {
 		if(index < 0 || index >= meshes.length) return;
 		meshes.splice(index, 1);
+		buildMeshBoundsCache();
 		FoxRenderer.mustRebuildDrawGroups = true;
 	}
 
@@ -252,21 +268,24 @@ class FoxModel extends FoxObject #if !foxlite_polymod implements IFoxCullable #e
 		// Use a temporary bounding box because what we're accumulating is not local space, but global space
 		// In the future maybe change this if transforms are separated so there's a local and a global
 		final tmpBox = BoundingBox.__tempBounds;
-		tmpBox.copyFrom(output);
-		for(mesh in meshes) if(mesh?.bounds != null) tmpBox.expand(mesh.bounds);
-		tmpBox.extents.scaleBy(cullMargin);
+		tmpBox.copyFrom(cacheBounds);
 		tmpBox.getTransformed(transform, tmpBox);
 		output.expand(tmpBox);
 	}
 
+	public function buildMeshBoundsCache() {
+		cacheBounds.zero();
+		for(mesh in meshes) if(mesh?.bounds != null) cacheBounds.expand(mesh.bounds);
+	}
+
 	public override function draw(camera:FoxCamera) {
 		super.draw(camera);
-		if(camera.doFrustumCulling) {
-			if(frustumCulling) testAndCull(camera);
-			else if(culled) {
-				FoxRenderer.mustRebuildDrawGroups = true;
-				culled = false;
-			}
+		if(!camera.doFrustumCulling) return;
+		
+		if(frustumCulling) testAndCull(camera);
+		else if(culled) {
+			FoxRenderer.mustRebuildDrawGroups = true;
+			culled = false;
 		}
 	}
 
