@@ -63,8 +63,8 @@ class FoxFPSCamera extends FoxCamera {
 	public var touchLastY:Int = 0;
 	#end
 
-	public function new(x:Float=0, y:Float=0, z:Float=0, bgColor:FlxColor=0x0, ortho:Bool=false) {
-		super(x, y, z, bgColor, ortho);
+	public function new(x:Float=0, y:Float=0, z:Float=0, bgColor:FlxColor=0x0, ortho:Bool=false, withLightData:Bool=true) {
+		super(x, y, z, bgColor, ortho, withLightData);
 	}
 
 	public override function update(dt:Float) {

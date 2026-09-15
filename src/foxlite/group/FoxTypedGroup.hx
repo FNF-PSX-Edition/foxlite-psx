@@ -120,7 +120,12 @@ class FoxTypedGroup #if !foxlite_polymod <T:FoxBasic> #end extends FoxBasic {
 
 	public override function update(dt:Float) {
 		super.update(dt);
-		for(m in members) if(m != null && m.active) m.update(dt);
+		var removals:Array<T> = [];
+		for(m in members) if(m != null && m.isActive()) {
+			m.update(dt);
+			if(m.__destroyed) removals.push(m);
+		}
+		for(r in removals) remove(r);
 	}
 
 	public override function draw(camera:FoxCamera) {
@@ -129,7 +134,7 @@ class FoxTypedGroup #if !foxlite_polymod <T:FoxBasic> #end extends FoxBasic {
 	}
 
 	public override function pushDrawData(scene:FoxScene) {
-		for(m in members) if(m != null && m.visible) m.pushDrawData(scene);
+		for(m in members) if(m != null && m.isVisible()) m.pushDrawData(scene);
 	}
 
 	public override function destroy() {

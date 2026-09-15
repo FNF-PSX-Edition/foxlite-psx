@@ -14,22 +14,48 @@ import openfl.display3D.Context3D;
 import openfl.geom.Matrix3D;
 import foxlite.culling.BoundingBox;
 
-class FoxModel extends FoxObject {
+class FoxModel extends FoxObject #if !foxlite_polymod implements IFoxCullable #end {
 
 	public var layers:FoxLayer;
 
+	public var context:Context3D;
+
+	//// IFoxCullable
 	/**
 		If enabled, this will perform frustum culling, meaning this object will disable its rendering when it's not
 		visible by the camera. If you have many many objects on-screen that shouldn't be visible off-screen,
 		keep this enabled
 	**/
 	public var frustumCulling:Bool;
+
+	/**
+		If true, this object will not call `update()`. Keep in mind this will disable
+		any logic you've put here if extending this class.
+	**/
+	public var deactivateWhenCulled:Bool = false;
+
 	/**
 		The scale for the meshes extents, increase this if your object gets culled too early
 	**/
 	public var cullMargin:Float = 1;
 
-	public var context:Context3D;
+	/**
+		This value is set per-camera at draw time, indicating if the model has been culled
+
+		To disable these calculations, set `frustumCulling` to disabled
+	**/
+	public var culled:Bool = false;
+	////
+
+	/**
+		Precalculated bounds for all meshes of this model
+
+		Updates when a mesh is added/removed
+
+		__Note:__ Vertex data updated manually are not accounted for this,
+		you'd have to rebuild the mesh bounds via `fromExtents()`
+	**/
+	public var cacheBounds:BoundingBox = new BoundingBox();
 
 	/**
 		This is the object's transform from a previous frame, used for motion vector calculations.
@@ -79,6 +105,7 @@ class FoxModel extends FoxObject {
 
 	private function set_meshes(v:Array<FoxMesh>) {
 		this.meshes = v;
+		if(v != null) buildMeshBoundsCache();
 		FoxRenderer.mustRebuildDrawGroups = true;
 		return v;
 	}
@@ -140,6 +167,14 @@ class FoxModel extends FoxObject {
 		}
 	}
 
+	public override function isVisible():Bool {
+		return super.isVisible() && !culled;
+	}
+
+	public override function isActive():Bool {
+		return super.isActive() && !(deactivateWhenCulled && culled);
+	}
+
 	// Just a proxy to make things easier
 	public function renderMesh(mesh:FoxMesh, shader:FoxShader) {
 		if(mesh.buffers[FoxVertexBufferType.INDICES] != null) FoxRenderer.drawMesh(context, mesh, shader);
@@ -150,22 +185,27 @@ class FoxModel extends FoxObject {
 	}
 
 	public inline function addMesh(mesh:FoxMesh) {
-		meshes.push(mesh);
-		FoxRenderer.mustRebuildDrawGroups = true;
+		if(mesh != null) {
+			meshes.push(mesh);
+			cacheBounds.expand(mesh.bounds);
+			FoxRenderer.mustRebuildDrawGroups = true;
+		}
 	}
 
 	public inline function setMeshAt(index:Int, mesh:FoxMesh) {
 		meshes[index] = mesh;
+		buildMeshBoundsCache();
 		FoxRenderer.mustRebuildDrawGroups = true;
 	}
 
 	public inline function removeMesh(mesh:FoxMesh) {
-		FoxRenderer.mustRebuildDrawGroups = meshes.remove(mesh);
+		if((FoxRenderer.mustRebuildDrawGroups = meshes.remove(mesh))) buildMeshBoundsCache();
 	}
 
 	public inline function removeMeshByIndex(index:Int) {
 		if(index < 0 || index >= meshes.length) return;
 		meshes.splice(index, 1);
+		buildMeshBoundsCache();
 		FoxRenderer.mustRebuildDrawGroups = true;
 	}
 
@@ -225,9 +265,45 @@ class FoxModel extends FoxObject {
 	**/
 	public override function computeBounds(output:BoundingBox):Void {
 		super.computeBounds(output);
-		for(mesh in meshes) if(mesh?.bounds != null) output.expand(mesh.bounds);
-		output.extents.scaleBy(cullMargin);
-		output.getTransformed(transform, output);
+		// Use a temporary bounding box because what we're accumulating is not local space, but global space
+		// In the future maybe change this if transforms are separated so there's a local and a global
+		final tmpBox = BoundingBox.__tempBounds;
+		tmpBox.copyFrom(cacheBounds);
+		tmpBox.getTransformed(transform, tmpBox);
+		output.expand(tmpBox);
+	}
+
+	public function buildMeshBoundsCache() {
+		cacheBounds.zero();
+		for(mesh in meshes) if(mesh?.bounds != null) cacheBounds.expand(mesh.bounds);
+	}
+
+	public override function draw(camera:FoxCamera) {
+		super.draw(camera);
+		if(!camera.doFrustumCulling) return;
+		
+		if(frustumCulling) testAndCull(camera);
+		else if(culled) {
+			FoxRenderer.mustRebuildDrawGroups = true;
+			culled = false;
+		}
+	}
+
+	/**
+		Performs frustum culling by checking the sorrounding bounding box against a camera frustum
+	**/
+	public override function testAndCull(camera:FoxCamera) {
+		// Check frustum culling
+		final tmpBox = BoundingBox.__tempBounds2;
+		tmpBox.zero();
+		computeBounds(tmpBox);
+		tmpBox.getTransformed(camera.viewMatrix, tmpBox); // To view space
+		
+		var test = !camera.frustumPlanes.overlapsBox(tmpBox);
+		if(test != culled) {
+			FoxRenderer.mustRebuildDrawGroups = true;
+			culled = test;
+		}
 	}
 
 	public override function destroy() {

@@ -7,6 +7,7 @@ import StringBuf;
 import haxe.ds.StringMap;
 import foxlite.FoxCache;
 import foxlite.FoxShader;
+import foxlite.culling.BoundingBox;
 import foxlite.instancing.FoxInstanceData;
 import foxlite.lights.FoxLightData;
 import foxlite.material.FoxBlendMode;
@@ -314,6 +315,10 @@ class FoxRenderer {
 		VectorFactory.staticInit();
 		FoxLightData.staticInit();
 		FoxShader.staticInit();
+		#if foxlite_polymod
+		trace(BoundingBox.__tempBounds);
+		trace(BoundingBox.__tempBounds2);
+		#end
 	}
 
 	/*

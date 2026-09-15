@@ -4,6 +4,8 @@ import flixel.math.FlxPoint;
 import flixel.util.FlxColor;
 import foxlite.FoxLayer;
 import foxlite.animation.FoxLerp;
+import foxlite.culling.BoundingBox;
+import foxlite.culling.FrustumPlanes;
 import foxlite.lights.FoxLightData;
 import foxlite.math.FoxMathUtil;
 import foxlite.renderer.FoxRenderPass;
@@ -65,9 +67,17 @@ class FoxCamera extends FoxObject {
 	// Temporary matrix for space coordinate transforms
 	public final __tempMatrix = new Matrix3D();
 
-	// Frustum culling (TODO)
+	
+	/**
+		If enabled, this camera will calculate its frustum planes and determine
+		if models are inside it, culling what's outside the view and improving performance.
 
+		This is much needed for big worlds and/or small details that are not needed
+		when off-screen
+	**/
 	public var doFrustumCulling:Bool = true;
+
+	public var frustumPlanes:FrustumPlanes = new FrustumPlanes();
 
 	/**
 		The light data associated with this camera.
@@ -78,7 +88,7 @@ class FoxCamera extends FoxObject {
 		Normally, this is handled by the camera itself and the lights on the scene,
 		so you don't need to touch this unless you know what you're doing!
 	**/
-	public var lightData:FoxLightData = new FoxLightData();
+	public var lightData:FoxLightData;
 
 	/**
 		If set, this camera will use a custom environment
@@ -88,15 +98,14 @@ class FoxCamera extends FoxObject {
 	public var __invProjectionData:Array<Float> = [for (i in 0...16) 0.0];
 	public var __invSkyViewData:Array<Float> = [for (i in 0...16) 0.0];
 
-	public function new(x:Float=0, y:Float=0, z:Float=0, _bgColor:FlxColor=0x0, ortho:Bool=false) {
+	public function new(x:Float=0, y:Float=0, z:Float=0, _bgColor:FlxColor=0x0, ortho:Bool=false, withLightData:Bool=true) {
 		super(x, y, z);
 		bgColor = _bgColor;
 		orthogonal = ortho;
 		name = "FoxCamera";
 		passes[0].useCameraColor = true;
+		if(withLightData) lightData = new FoxLightData();
 	}
-
-	public override function draw(camera:FoxCamera) {}
 
 	public override function update(dt:Float) {
 		super.update(dt);
@@ -150,6 +159,8 @@ class FoxCamera extends FoxObject {
 			}
 			if (updateOffset)
 				__lastProjectionOrigin.copyFrom(projectionOrigin);
+
+			if(doFrustumCulling) frustumPlanes.fromProjection(projectionMatrix);
 
 			__updateProjection = false;
 		}

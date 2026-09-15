@@ -147,31 +147,24 @@ class FoxScene extends FoxExtendableSprite {
 
 		for(cam in foxCameras) if(cam.active) cam.update(elapsed);
 
-		var __removals:Array<FoxBasic> = [];
-		for(member in foxGroup.members) {
-			if(member.__destroyed) {
-				__removals.push(member);
-				continue;
-			}
-			if(member.active) member.update(elapsed);
-		}
-
-		while(__removals.length > 0) remove(__removals.pop());
+		foxGroup.update(elapsed);
 	}
 
 	public override function draw() {
 		FoxRenderer.begin();
 		onPreDraw.dispatch();
 
-		// Prepare draw groups
-		if(FoxRenderer.mustRebuildDrawGroups) buildDrawGroups();
-
 		for(cam in foxCameras) {
 			if(!cam.visible) continue;
 			cam.lightData?.clearLights();
 			cam.scene = this;
+
 			// Draw call for our members before actual rendering
-			for(m in foxGroup.members) if(m.visible) m.draw(cam);
+			// This now computes frustum culling aswell
+			foxGroup.draw(cam);
+
+			// Prepare draw groups, now moved here if any model dynamically changed its visibility
+			if(FoxRenderer.mustRebuildDrawGroups) buildDrawGroups();
 
 			cam.lightData?.prepareLights(cam);
 			cam.render(drawGroups);
@@ -198,7 +191,7 @@ class FoxScene extends FoxExtendableSprite {
 	*/
 	public function buildDrawGroups():Array<FoxDrawTree> {
 		for(g in drawGroups) g.clear(); 
-		for(m in foxGroup.members) if(m.visible) m.pushDrawData(this);
+		foxGroup.pushDrawData(this);
 		return drawGroups;
 	}
 
