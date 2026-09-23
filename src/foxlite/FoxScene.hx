@@ -21,6 +21,9 @@ import haxe.ds.StringMap;
 import lime.math.Vector2;
 import openfl.display3D.Context3D;
 import openfl.geom.Vector3D;
+#if lime_box3d
+import foxlite.physics.FoxPhysicsWorld;
+#end
 
 class FoxScene extends FoxExtendableSprite {
 
@@ -62,6 +65,25 @@ class FoxScene extends FoxExtendableSprite {
 		Note: Subject to change in the future.
 	**/
 	public var environment:FoxEnvironment = new FoxEnvironment();
+	
+	/**
+		The Box3D physics world container for this scene, this handles all physics
+		related functions
+
+		__Note:__ Only available if [lime-box3d](https://github.com/TheZoroForce240/lime-box3d) is installed
+	**/
+	#if lime_box3d
+	public var physicsWorld(default, set):FoxPhysicsWorld;
+
+	function set_physicsWorld(v:FoxPhysicsWorld):FoxPhysicsWorld {
+		this.physicsWorld = v;
+		if(v == null) return v;
+		v.onPhysicsUpdate = foxGroup.physicsUpdate;
+		return v;
+	}
+	#else
+	public var physicsWorld:Dynamic;
+	#end
 
 	/**
 	* An array of `BalancedTree` containing sorted `FoxDrawTree` for drawing.
@@ -147,6 +169,7 @@ class FoxScene extends FoxExtendableSprite {
 
 		for(cam in foxCameras) if(cam.active) cam.update(elapsed);
 
+		physicsWorld?.update(elapsed);
 		foxGroup.update(elapsed);
 	}
 

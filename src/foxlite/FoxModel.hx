@@ -123,6 +123,20 @@ class FoxModel extends FoxObject #if !foxlite_polymod implements IFoxCullable #e
 	public var materialOverlay:FoxMaterial = null;
 
 	/**
+		An array for each mesh which can have an overriden material.
+
+		Set it to its respective index to override it. Null to remove it.
+	**/
+	public var perMeshMaterialOverride:Array<FoxMaterial> = [];
+
+	/**
+		An array for each mesh which can have an overlay material.
+
+		Set it to its respective index to override it. Null to remove it.
+	**/
+	public var perMeshMaterialOverlay:Array<FoxMaterial> = [];
+
+	/**
 		The skin associated with this mesh, assigned when added to a `FoxArmature`
 	**/
 	public var skin:FoxSkinData = null;
@@ -153,17 +167,23 @@ class FoxModel extends FoxObject #if !foxlite_polymod implements IFoxCullable #e
 
 	public override function update(dt:Float) {
 		if(FoxRenderer.calculateMotionVectors) __prevTransform.copyRawDataFrom(transform.rawData);
+		if(skin != null) skin.needsUpdate = true; // Request updating for the armature
 		super.update(dt);
 	}
 
 	public override function pushDrawData(scene:FoxScene) {
-		for(mesh in meshes) {
-			var mat = materialOverride ?? mesh.material ?? FoxRenderer.MISSING_MATERIAL;
+		for(i=>mesh in meshes) {
+			var mat = perMeshMaterialOverride[i] ?? materialOverride ?? mesh.material ?? FoxRenderer.MISSING_MATERIAL;
 			if(mat != null) scene.addToDrawGroups(mat, mesh, groups, this);
 		}
 		// For overlay, add another node
 		if(materialOverlay != null) for(mesh in meshes) {
 			scene.addToDrawGroups(materialOverlay, mesh, groups, this);
+		}
+		// For overlay-per-mesh
+		if(perMeshMaterialOverlay.length > 0) for(i=>mesh in meshes) {
+			var mat = perMeshMaterialOverlay[i];
+			if(mat != null) scene.addToDrawGroups(mat, mesh, groups, this);
 		}
 	}
 
@@ -199,7 +219,9 @@ class FoxModel extends FoxObject #if !foxlite_polymod implements IFoxCullable #e
 	}
 
 	public inline function removeMesh(mesh:FoxMesh) {
-		if((FoxRenderer.mustRebuildDrawGroups = meshes.remove(mesh))) buildMeshBoundsCache();
+		if((FoxRenderer.mustRebuildDrawGroups = meshes.remove(mesh))) {
+			buildMeshBoundsCache();
+		}
 	}
 
 	public inline function removeMeshByIndex(index:Int) {
@@ -239,6 +261,36 @@ class FoxModel extends FoxObject #if !foxlite_polymod implements IFoxCullable #e
 	public function setMaterial(meshIdx:Int, mat:FoxMaterial) {
 		var m:FoxMesh = meshes[meshIdx];
 		if(m != null) m.material = mat;
+	}
+
+	/**
+		Shortcut to get an overriden material from a mesh by index
+	**/
+	public function getMeshMaterialOverride(meshIdx:Int):FoxMaterial {
+		return perMeshMaterialOverride[meshIdx];
+	}
+
+	/**
+		Shortcut to assign an overriden material from a mesh by index
+	**/
+	public function setMeshMaterialOverride(meshIdx:Int, mat:FoxMaterial) {
+		if(meshIdx < perMeshMaterialOverride.length)
+			perMeshMaterialOverride[meshIdx] = mat;
+	}
+
+	/**
+		Shortcut to get an overriden material from a mesh by index
+	**/
+	public function getMeshMaterialOverlay(meshIdx:Int):FoxMaterial {
+		return perMeshMaterialOverlay[meshIdx];
+	}
+
+	/**
+		Shortcut to assign an overriden material from a mesh by index
+	**/
+	public function setMeshMaterialOverlay(meshIdx:Int, mat:FoxMaterial) {
+		if(meshIdx < perMeshMaterialOverlay.length)
+			perMeshMaterialOverlay[meshIdx] = mat;
 	}
 
 	/**

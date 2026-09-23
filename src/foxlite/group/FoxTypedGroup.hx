@@ -128,6 +128,11 @@ class FoxTypedGroup #if !foxlite_polymod <T:FoxBasic> #end extends FoxBasic {
 		for(r in removals) remove(r);
 	}
 
+	public override function physicsUpdate(dt:Float) {
+		super.physicsUpdate(dt);
+		for(m in members) if(m != null && m.isActive()) m.physicsUpdate(dt);
+	}
+
 	public override function draw(camera:FoxCamera) {
 		super.draw(camera);
 		for(m in members) if(m != null && m.visible) m.draw(camera);

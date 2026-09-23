@@ -31,6 +31,7 @@ class FoxMathUtil {
 		Cache temporary matrices
 	**/
 	public static final __tempMatrix = new Matrix3D();
+	public static final __tempMatrix2 = new Matrix3D();
 
 	/**
 		Cached Identity values so no allocation happens when calling openfl's `Matrix3D.identity()`
@@ -64,7 +65,7 @@ class FoxMathUtil {
 
 	public static function staticInit() {
 		#if foxlite_polymod
-		trace(degToRad, radToDeg, RIGHT, UP, FORWARD, LEFT, DOWN, BACK, ZERO, ONE, TAU, PI_2, __tempVector, __tempVector2, __tempVector3, MATRIX_IDENTITY, MATRIX_DIRECTIONS);
+		trace(degToRad, radToDeg, RIGHT, UP, FORWARD, LEFT, DOWN, BACK, ZERO, ONE, TAU, PI_2, __tempVector, __tempVector2, __tempVector3, MATRIX_IDENTITY, MATRIX_DIRECTIONS, __tempMatrix, __tempMatrix2);
 		#end
 		// Idk why some directions are inverted, but this seems to correspond to what foxlite uses
 		MATRIX_DIRECTIONS[FoxCubemapSide.RIGHT].pointAt(ZERO, RIGHT, DOWN);
@@ -136,21 +137,12 @@ class FoxMathUtil {
 	public static function transformMatrix(matTRS:Matrix3D, pos:Vector3D, rotEuler:Vector3D, scale:Vector3D):Matrix3D {
 		matTRS.copyRawDataFrom(MATRIX_IDENTITY); // identity()
 		if(!scale.equals(FoxMathUtil.ONE)) {
-			matTRS.appendScale(scale.x, scale.y, scale.z); // It's actually 2 new allocs, bruh openfl
-			FoxRenderer.allocationsThisFrame += 2;
+			FoxMathUtil.fastAppendScale(matTRS, scale.x, scale.y, scale.z);
 		}
 
-		// These methods are so incredibly wasteful in memory, since they create more Matrix3D's
-		// but we have to use them because doing them in HScript will be slow af
-		// We can't use recompose() because it has a different rotation order
-		// it just messes up our rotations, we need YXZ order to preserve Z rotation:
-		final rot = __tempVector;
-		rot.copyFrom(rotEuler);
-		rot.scaleBy(radToDeg);
-		if(rot.z != 0) { matTRS.appendRotation(rot.z, BACK);  FoxRenderer.allocationsThisFrame++; }
-		if(rot.y != 0) { matTRS.appendRotation(rot.y, UP);    FoxRenderer.allocationsThisFrame++; }
-		if(rot.x != 0) { matTRS.appendRotation(rot.x, RIGHT); FoxRenderer.allocationsThisFrame++; }
-
+		if(rotEuler.z != 0) alloclessAppendRotation(matTRS, rotEuler.z, BACK);
+		if(rotEuler.y != 0) alloclessAppendRotation(matTRS, rotEuler.y, UP);
+		if(rotEuler.x != 0) alloclessAppendRotation(matTRS, rotEuler.x, RIGHT);
 		matTRS.appendTranslation(pos.x, pos.y, pos.z);
 
 		return matTRS;
@@ -158,12 +150,9 @@ class FoxMathUtil {
 
 	public static function basisMatrix(matR:Matrix3D, rotEuler:Vector3D):Matrix3D {
 		matR.copyRawDataFrom(MATRIX_IDENTITY); // identity()
-		final rot = __tempVector;
-		rot.copyFrom(rotEuler);
-		rot.scaleBy(radToDeg);
-		if(rot.z != 0) { matR.appendRotation(rot.z, BACK);  FoxRenderer.allocationsThisFrame++; }
-		if(rot.y != 0) { matR.appendRotation(rot.y, UP);    FoxRenderer.allocationsThisFrame++; }
-		if(rot.x != 0) { matR.appendRotation(rot.x, RIGHT); FoxRenderer.allocationsThisFrame++; }
+		if(rotEuler.z != 0) alloclessAppendRotation(matR, rotEuler.z, BACK);
+		if(rotEuler.y != 0) alloclessAppendRotation(matR, rotEuler.y, UP);
+		if(rotEuler.x != 0) alloclessAppendRotation(matR, rotEuler.x, RIGHT);
 		return matR;
 	}
 
@@ -171,16 +160,9 @@ class FoxMathUtil {
 		matRT.copyRawDataFrom(MATRIX_IDENTITY); // identity()
 		matRT.appendTranslation(-pos.x, -pos.y, -pos.z);
 
-		// These methods are so incredibly wasteful in memory, since they create more Matrix3D's
-		// but we have to use them because doing them in HScript will be slow af
-		// We can't use recompose() because it has a different rotation order
-		// it just messes up our rotations, we need YXZ order to preserve Z rotation:
-		final rot = __tempVector;
-		rot.copyFrom(rotEuler);
-		rot.scaleBy(-radToDeg);
-		if(rot.y != 0) { matRT.appendRotation(rot.y, UP);    FoxRenderer.allocationsThisFrame++; }
-		if(rot.x != 0) { matRT.appendRotation(rot.x, RIGHT); FoxRenderer.allocationsThisFrame++; }
-		if(rot.z != 0) { matRT.appendRotation(rot.z, BACK);  FoxRenderer.allocationsThisFrame++; }
+		if(rotEuler.y != 0) alloclessAppendRotation(matRT, -rotEuler.y, UP);
+		if(rotEuler.x != 0) alloclessAppendRotation(matRT, -rotEuler.x, RIGHT);
+		if(rotEuler.z != 0) alloclessAppendRotation(matRT, -rotEuler.z, BACK);
 
 		return matRT;
 	}
@@ -194,11 +176,11 @@ class FoxMathUtil {
 
 		// We also apply scale normalization to prevent weirdness when the camera transform has scale applied
 		var rot = eulerFromMatrix(transform, __tempVector, scaleFromMatrix(transform, __tempVector2));
-		rot.scaleBy(-radToDeg);
+		rot.scaleBy(-1);
 		
-		if(rot.z != 0) { output.appendRotation(rot.z, BACK);  FoxRenderer.allocationsThisFrame++; }
-		if(rot.y != 0) { output.appendRotation(rot.y, UP);    FoxRenderer.allocationsThisFrame++; }
-		if(rot.x != 0) { output.appendRotation(rot.x, RIGHT); FoxRenderer.allocationsThisFrame++; }
+		if(rot.z != 0) alloclessAppendRotation(output, rot.z, BACK);
+		if(rot.y != 0) alloclessAppendRotation(output, rot.y, UP);
+		if(rot.x != 0) alloclessAppendRotation(output, rot.x, RIGHT);
 		return output;
 	}
 
@@ -238,6 +220,109 @@ class FoxMathUtil {
 		a[4] = m1; a[6] = m9; a[7] = m13;
 		a[8] = m2; a[9] = m6; a[11] = m14;
 		a[12] = m3; a[13] = m7; a[14] = m11;
+		return matrix;
+	}
+
+	/**
+		Allocationless scale append (OpenFL creates another matrix and vector from an array)
+
+		Also with reduced operations by simplifying the rest of the matrix
+	**/
+	public static function fastAppendScale(matrix:Matrix3D, x:Float=1, y:Float=1, z:Float=1):Matrix3D {
+		final a = matrix.rawData.__array;
+		a[0] *= x;  a[1] *= y;  a[2] *= z;
+		a[4] *= x;  a[5] *= y;  a[6] *= z;
+		a[8] *= x;  a[9] *= y;  a[10] *= z;
+		a[12] *= x; a[13] *= y; a[14] *= z;
+		return matrix;
+	}
+
+	/**
+		Allocationless rotation append (OpenFL creates another Matrix)
+
+		__Note:__ Pivot point argument is no longer present, translate the matrix manually
+		before and after rotation, this also simplifies calculations...
+
+		__Note2:__ This makes use of the internal temporary matrix, make sure you're not
+		overlapping it with itself as the input
+	**/
+	public static function alloclessAppendRotation(matrix:Matrix3D, radian:Float, axis:Vector3D) {
+		var cos = Math.cos(radian);
+		var sin = Math.sin(radian);
+		var x:Float = axis.x, y:Float = axis.y, z:Float = axis.z;
+		var x2:Float = x * x, y2:Float = y * y, z2:Float = z * z;
+		var ls:Float = x2 + y2 + z2;
+		if (ls != 0) {
+			var l = Math.sqrt(ls);
+			x /= l; y /= l; z /= l;
+			x2 /= ls; y2 /= ls; z2 /= ls;
+		}
+		var ccos = 1 - cos;
+		final m = __tempMatrix2;
+		final d = m.rawData.__array;
+		d[0] = x2 + (y2 + z2) * cos;
+		d[1] = x * y * ccos + z * sin;
+		d[2] = x * z * ccos - y * sin;
+		d[4] = x * y * ccos - z * sin;
+		d[5] = y2 + (x2 + z2) * cos;
+		d[6] = y * z * ccos + x * sin;
+		d[8] = x * z * ccos + y * sin;
+		d[9] = y * z * ccos - x * sin;
+		d[10] = z2 + (x2 + y2) * cos;
+		d[12] = d[13] = d[14] = 0; // This always sets origin to 0?
+		d[15] = 1;
+		matrix.append(m);
+	}
+
+	public inline static function alloclessAppendRotationDegrees(matrix:Matrix3D, radian:Float, axis:Vector3D) {
+		return alloclessAppendRotation(matrix, radian * degToRad, axis);
+	}
+
+	/**
+		Based on Matrix3D's pointAt, but allocationless.
+
+		__Note:__ This makes use of temporary vectors
+
+		https://stackoverflow.com/questions/349050/calculating-a-lookat-matrix
+	**/
+	public inline static function lookAt(matrix:Matrix3D, pos:Vector3D, ?at:Vector3D, ?up:Vector3D):Matrix3D {
+		if(at == null) at = FORWARD;
+		if(up == null) up = UP;
+
+		// zaxis = normal(At - Eye)
+		final forward = __tempVector;
+		forward.copyFrom(at);
+		forward.decrementBy(pos);
+		forward.normalize();
+
+		// xaxis = normal(cross(Up, zaxis))
+		final right = __tempVector2;
+		right.copyFrom(up);
+		right.crossProductToOutput(forward, right);
+		// no normalization to be onpar with flash
+
+		// yaxis = cross(zaxis, xaxis)
+		final vup = __tempVector3;
+		vup.copyFrom(forward);
+		vup.crossProductToOutput(right, vup);
+
+		final a = matrix.rawData.__array;
+		a[0] = right.x;
+		a[4] = right.y;
+		a[8] = right.z;
+		a[12] = 0.0;
+		a[1] = vup.x;
+		a[5] = vup.y;
+		a[9] = vup.z;
+		a[13] = 0.0;
+		a[2] = forward.x;
+		a[6] = forward.y;
+		a[10] = forward.z;
+		a[14] = 0.0;
+		a[3] = pos.x;
+		a[7] = pos.y;
+		a[11] = pos.z;
+		a[15] = 1.0;
 		return matrix;
 	}
 
@@ -286,9 +371,12 @@ class FoxMathUtil {
 
 		__Note:__ This expects the quaternion vector to be normalized.
 	**/
-	public static function eulerFromQuaternion(quat:Vector3D, ?output:Vector3D):Vector3D {
+	public inline static function eulerFromQuaternion(quat:Vector3D, ?output:Vector3D):Vector3D {
+		return eulerFromQuaternionComponent(quat.x, quat.y, quat.z, quat.w, output);
+	}
+
+	public static function eulerFromQuaternionComponent(x:Float, y:Float, z:Float, w:Float, ?output:Vector3D):Vector3D {
 		var e = output ?? new Vector3D();
-		var x:Float = quat.x, y:Float = quat.y, z:Float = quat.z, w:Float = quat.w;
 
 		var m0 = 1 - 2 * y * y - 2 * z * z,
 			m4 = 2 * x * y - 2 * w * z,
@@ -324,21 +412,25 @@ class FoxMathUtil {
 		return output;
 	}
 
+	public inline static function quaternionFromEuler(rot:Vector3D, ?output:Vector3D):Vector3D {
+		return quaternionFromEulerComponent(rot.x, rot.y, rot.z, output);
+	}
+
 	/**
 		From OpenFL's Matrix3D.recompose(EULER_ANGLES) -> decompose(QUATERNION), allocationless.
 	**/
-	public static function quaternionFromEuler(rot:Vector3D, ?output:Vector3D):Vector3D {
+	public static function quaternionFromEulerComponent(x:Float, y:Float, z:Float, ?output:Vector3D):Vector3D {
 		if(output == null) {
 			output = new Vector3D();
 			FoxRenderer.allocationsThisFrame += 1;
 		}
 		// Euler -> Matrix
-		var cx = Math.cos(rot.x);
-		var cy = Math.cos(rot.y);
-		var cz = Math.cos(rot.z);
-		var sx = Math.sin(rot.x);
-		var sy = Math.sin(rot.y);
-		var sz = Math.sin(rot.z);
+		var cx = Math.cos(x);
+		var cy = Math.cos(y);
+		var cz = Math.cos(z);
+		var sx = Math.sin(x);
+		var sy = Math.sin(y);
+		var sz = Math.sin(z);
 
 		var mr0 = cy * cz;
 		var mr1 = cy * sz;

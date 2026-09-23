@@ -116,6 +116,11 @@ class FoxMaterial {
 		return FlxColor.fromRGBFloat(c[0], c[1], c[2], c[3]);
 	}
 
+	public function setAlpha(alpha:Float=1):FoxMaterial {
+		params.get("color")[3] = alpha;
+		return this;
+	}
+
 	/**
 		Sets the material emissive color, this is the light emitted from the model, acts like `colorOffsets`
 
@@ -192,6 +197,21 @@ class FoxMaterial {
 			s[0] = red; s[1] = green; s[2] = blue;
 		}
 		return this;
+	}
+
+	/**
+		Shortcut for `params.set`
+	**/
+	public inline function setParam(pname:String, value:Dynamic):FoxMaterial {
+		params.set(pname, value);
+		return this;
+	}
+
+	/**
+		Shortcut for `params.get`
+	**/
+	public inline function getParam(pname:String):Dynamic {
+		return params.get(pname);
 	}
 
 	/**

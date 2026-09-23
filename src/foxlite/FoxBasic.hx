@@ -28,6 +28,12 @@ class FoxBasic {
 	}
 
 	/**
+		Called when a physics frame occurs, this is a constant
+		update regardless of framerate for a consistant physics simulation. 
+	**/
+	public function physicsUpdate(dt:Float) {}
+
+	/**
 		Intended for transforms, actual drawing happens in the camera render pass
 	**/
 	public function draw(camera:FoxCamera):Void {}

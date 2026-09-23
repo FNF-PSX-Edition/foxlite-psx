@@ -300,7 +300,17 @@ class FoxRenderPass {
 				// -- Skinned mesh --
 				var skinloc = _shader.__uSkinnedLocation;
 				if(skinloc != -1) {
-					if(model.skin == null || model.skin.bones.length == 0) GL.uniform1i(cast skinloc, 0);	// uSkinned = false
+					if(model.skin == null || model.skin.bones.length == 0) {
+						GL.uniform1i(cast skinloc, 0);	// uSkinned = false
+						FoxRenderer.useTexture(samplerOffset, FoxRenderer.BLACK_PIXEL);
+						GL.uniform1i(cast _shader.__bonesDataLocation, samplerOffset); // BONESDATA to red pixel
+
+						if(FoxRenderer.calculateMotionVectors) {
+							samplerOffset += 1;
+							FoxRenderer.useTexture(samplerOffset, FoxRenderer.BLACK_PIXEL);
+							GL.uniform1i(cast _shader.__prevBonesDataLocation, samplerOffset);
+						}
+					}
 					else {
 						// Upload bone transforms
 						var boneData = model.skin.boneData;

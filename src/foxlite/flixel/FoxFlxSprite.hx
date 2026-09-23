@@ -70,12 +70,12 @@ class FoxFlxSprite extends FoxModel {
 	public function new(target:FlxSprite, ?material_:FoxMaterial, ?spritePixelSize:Float) {
 		super();
 		name = "FoxFlxSprite";
-		if(target.pixels == null) return;
 		if(spritePixelSize == null) spritePixelSize = pixelSize;
 		pixelSize = spritePixelSize;
 		sprite = target;
 
-		var tex = FoxTexture.wrap(target.pixels);
+		if(target.pixels == null) return;
+		var tex = FoxTexture.wrap(getSpriteTexture());
 
 		if(material_ == null) {
 			material_ = FoxMaterial.create(FoxShader.fromAsset(FoxShader.BASIC), ["bitmap" => tex]);
@@ -103,6 +103,7 @@ class FoxFlxSprite extends FoxModel {
 
 	public function calculateMesh() {
 		var mesh = meshes[0];
+		if(mesh == null) return;
 		var vertices:Array<Float>;
 
 		if(sprite.frame == null) { // No frame
@@ -126,8 +127,9 @@ class FoxFlxSprite extends FoxModel {
 			mesh.updateBufferRaw(FoxVertexBufferType.VERTICES, verticesRaw);
 		}
 		else {
-			var width = sprite.pixels.width;
-			var height = sprite.pixels.height;
+			final tex = getSpriteTexture();
+			var width = tex.width;
+			var height = tex.height;
 			var frame = sprite.frame.frame;
 
 			var u = frame.x / width;
@@ -226,12 +228,22 @@ class FoxFlxSprite extends FoxModel {
 		#end
 	}
 
+	/**
+		Returns the current, active texture of the sprite
+
+		This also works with frame multi-atlas
+	**/
+	public inline function getSpriteTexture():BitmapData {
+		return sprite.frame?.parent?.bitmap ?? sprite.pixels;
+	}
+
 	public function checkBitmap() {
 		// Check bitmap changes
-		if(sprite.pixels == null) return;
-		if(__prevBitmap != sprite.pixels) {
-			material.textures.get("bitmap")?.take(sprite.pixels);
-			__prevBitmap = sprite.pixels;
+		var tex = getSpriteTexture();
+		if(tex == null || material == null) return;
+		if(__prevBitmap != tex) {
+			material.textures.get("bitmap")?.take(tex);
+			__prevBitmap = tex;
 			__recalculateBounds = true;
 		}
 

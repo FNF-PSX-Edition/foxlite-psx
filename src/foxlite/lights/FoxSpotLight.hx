@@ -62,6 +62,11 @@ class FoxSpotLight extends FoxBaseLight {
 	public override function setToLightData(camera:FoxCamera) {
 		var lightData = camera.lightData;
 		var distance = Vector3D.distance(globalPosition, camera.globalPosition);
+		
+		// Offset the light so we don't end up overwriting our entries
+		while(lightData.orderedSpotLights.exists(distance)) 
+			distance += 0.01; 
+
 		lightData.orderedSpotLights.set(distance, this);
 		FoxRenderer.allocationsThisFrame += 1; // Account for tree node
 	}

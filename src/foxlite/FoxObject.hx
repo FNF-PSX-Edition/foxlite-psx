@@ -49,18 +49,18 @@ class FoxObject extends FoxBasic {
 		FoxRenderer.allocationsThisFrame += 8;
 	}
 
-	public inline function setPosition(x:Float=0, y:Float=0, z:Float=0) {
+	public function setPosition(x:Float=0, y:Float=0, z:Float=0) {
 		return position.setTo(x, y, z);
 	}
 
-	public inline function setRotation(x:Float=0, y:Float=0, z:Float=0) {
+	public function setRotation(x:Float=0, y:Float=0, z:Float=0) {
 		return rotation.setTo(x, y, z);
 	}
 
 	/**
 		Same as `setRotation()` but for angle degrees.
 	**/
-	public inline function setAngle(x:Float=0, y:Float=0, z:Float=0) {
+	public function setAngle(x:Float=0, y:Float=0, z:Float=0) {
 		angleX = x;
 		angleY = y;
 		angleZ = z;
@@ -69,7 +69,7 @@ class FoxObject extends FoxBasic {
 	/**
 		Sets the object's angle degrees from a Vector3D
 	**/
-	public inline function setAngleFromVector(angles:Vector3D) {
+	public function setAngleFromVector(angles:Vector3D) {
 		setAngle(angles.x, angles.y, angles.z);
 	}
 
@@ -99,11 +99,11 @@ class FoxObject extends FoxBasic {
 		return FoxMathUtil.eulerFromQuaternion(rotation, rotation);
 	}
 
-	public inline function setRotationQuaternionFromVector(quat:Vector3D):Vector3D {
+	public function setRotationQuaternionFromVector(quat:Vector3D):Vector3D {
 		return setRotationQuaternion(quat.x, quat.y, quat.z, quat.w);
 	}
 
-	public inline function setScale(x:Float=1, y:Float=1, z:Float=1) {
+	public function setScale(x:Float=1, y:Float=1, z:Float=1) {
 		return scale.setTo(x, y, z);
 	}
 

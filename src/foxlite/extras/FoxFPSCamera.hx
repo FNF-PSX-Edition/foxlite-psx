@@ -1,11 +1,13 @@
 package foxlite.extras;
 
-import foxlite.math.FoxMathUtil;
+
 import Reflect;
+import foxlite.FoxCamera;
+import foxlite.math.FoxMathUtil;
+
 import flixel.FlxG;
 import flixel.math.FlxMath;
 import flixel.util.FlxColor;
-import foxlite.FoxCamera;
 import lime.math.Vector2;
 import openfl.geom.Vector3D;
 

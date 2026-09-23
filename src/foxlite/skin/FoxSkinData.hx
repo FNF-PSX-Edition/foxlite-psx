@@ -37,6 +37,8 @@ class FoxSkinData {
 	// Temporary Matrix3D for joint -> rest space conversion
 	var __tempMatrix:Matrix3D = new Matrix3D();
 
+	public var needsUpdate:Bool = true;
+
 	public function new() {}
 
 	public function addBone(bone:FoxBone, parentIndex:Int=-1) {

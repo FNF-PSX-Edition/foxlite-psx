@@ -49,9 +49,10 @@ class FoxArmature extends FoxObjectGroup {
 	
 	public override function update(dt:Float) {
 		super.update(dt);
-		if(skin != null) {
+		if(skin != null && skin.needsUpdate) {
 			skin.root.transform = this.transform;
 			skin.update(dt);
+			skin.needsUpdate = false;
 		}
 	}
 

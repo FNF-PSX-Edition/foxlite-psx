@@ -143,6 +143,13 @@ vec2 areaLight(vec3 lightPos, vec3 lightDirection, vec4 sdfData, float range, fl
 }	
 
 void addLight(inout vec3 diffuse, inout vec3 specular, vec3 color, vec2 light) {
+	#if defined(RIMLIGHT)
+	float rimLightIntensity = max(1.0 - dot(normalize(-viewPosition.xyz), modelViewNormal), 0.0);
+	rimLightIntensity = pow(rimLightIntensity, rimLightPower);
+	rimLightIntensity = smoothstep(rimLightCurve.x, rimLightCurve.y, rimLightIntensity);
+	color *= rimLightIntensity;
+	#endif
+
 	#ifdef TOONLIGHT_3
 	light = floor(light*3.0)/3.0;
 	#elif defined(TOONLIGHT_2)

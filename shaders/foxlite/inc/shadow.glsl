@@ -6,21 +6,20 @@ uniform sampler2D shadowCasterData;
 uniform float shadowCasterDataSize;
 #endif
 
-uniform sampler2D shadowtex0; // Directional light shadow atlas
 uniform samplerCube shadowtex1; // wip - Point light shadow cubemap
-uniform sampler2D shadowtex2; // Spot light shadow atlas
 uniform samplerCube shadowtex3; // wip - Area light shadow cubemap
 
-uniform vec2 shadowtex0size;
-uniform vec2 shadowtex2size;
-
 #if MAX_DIRECTIONAL_LIGHTS > 0
+	uniform sampler2D shadowtex0; // Directional light shadow atlas
+	uniform vec2 shadowtex0size;
 	varying vec4 directionalShadowLightSpace[MAX_DIRECTIONAL_LIGHTS];
 #endif
 #if MAX_POINT_LIGHTS > 0
 	varying vec4 pointShadowLightSpace[1];
 #endif
 #if MAX_SPOT_LIGHTS > 0
+	uniform sampler2D shadowtex2; // Spot light shadow atlas
+	uniform vec2 shadowtex2size;
 	varying vec4 spotShadowLightSpace[MAX_SPOT_LIGHTS];
 #endif
 #if MAX_AREA_LIGHTS > 0
