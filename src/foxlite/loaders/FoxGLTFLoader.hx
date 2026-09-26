@@ -475,7 +475,7 @@ class FoxGLTFLoader {
 						var view:Dynamic = bufferViews[accessor.bufferView];
 						var buffer:ByteArray = buffers[view.buffer];
 						if(buffer == null && accessor.sparse == null) {
-							FoxLog.warning('Buffer ${view.buffer} not found for mesh $i/$attrib, skipping!');
+							FoxLog.warning('FoxGLTFLoader', 'Buffer ${view.buffer} not found for mesh $i/$attrib, skipping!');
 							skip = true;
 							break;
 						}
@@ -573,7 +573,7 @@ class FoxGLTFLoader {
 
 		// Cache parent indices
 		for(i=>node in nodes) if(Std.isOfType(node.children, Array)) for(c in (node.children:Array<Int>)) {
-			if(parent[c] != null) FoxLog.warning('Node ${parent[c]} ($c) already has a parent!');
+			if(parent[c] != null) FoxLog.warning('FoxGLTFLoader', 'Node ${parent[c]} ($c) already has a parent!');
 			parent[c] = i;
 		}
 
@@ -662,7 +662,7 @@ class FoxGLTFLoader {
 					var bufferOut:ByteArray = buffers[viewOut.buffer];
 
 					if(bufferIn == null || bufferOut == null) {
-						FoxLog.warning('Buffers ${viewIn.buffer} and/or ${viewOut.buffer} not found for animation track "${node.name}:$path", skipping!');
+						FoxLog.warning('FoxGLTFLoader', 'Buffers ${viewIn.buffer} and/or ${viewOut.buffer} not found for animation track "${node.name}:$path", skipping!');
 						if(viewIn.buffer == viewOut.buffer) break;
 						else continue;
 					}
