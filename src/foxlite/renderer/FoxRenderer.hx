@@ -446,7 +446,7 @@ class FoxRenderer {
 		context.setRenderToBackBuffer();
 		
 		// Default blending
-		FoxRenderer.setBlendMode(context, FoxBlendMode.MIX, true);
+		FoxRenderer.setBlendMode(context, FoxBlendMode.PREMULTIPLIED_ALPHA, true);
 		// No depth test (important!)
 		context.setDepthTest(false, cast 0);
 		context.setCulling(cast 3);
