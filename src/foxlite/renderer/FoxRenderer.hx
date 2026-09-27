@@ -818,34 +818,36 @@ class FoxRenderer {
 	/**
 		Renders a mesh, simple as that! Render pipeline must be set up for this.
 	**/
-	public static function drawMesh(context:Context3D, mesh:FoxMesh, shader:FoxShader) {
-		final indexBuffer = mesh.buffers[FoxVertexBufferType.INDICES];
+	public static function drawMesh(context:Context3D, mesh:FoxMesh, shader:FoxShader, lod:Int=0) {
+		final buffers = mesh.getLod(lod);
+		if(buffers == null) return;
+		final indexBuffer = buffers[FoxVertexBufferType.INDICES];
 		var elements = indexBuffer?.count ?? 0;
 		if(elements == 0) return;
 		var gl = context.gl;
 		var attrib = shader.attribIdx;
 
 		// Attributes
-		FoxRenderer.setAttributePointerAt(attrib.position, mesh.buffers[FoxVertexBufferType.VERTICES]);
+		FoxRenderer.setAttributePointerAt(attrib.position, buffers[FoxVertexBufferType.VERTICES]);
 		if(attrib.texCoord != -1) 
-			FoxRenderer.setAttributePointerAt(attrib.texCoord, mesh.buffers[FoxVertexBufferType.UVS]);
+			FoxRenderer.setAttributePointerAt(attrib.texCoord, buffers[FoxVertexBufferType.UVS]);
 
 		if(attrib.normal != -1) {
-			FoxRenderer.setAttributePointerAt(attrib.normal, mesh.buffers[FoxVertexBufferType.NORMALS]);
-			FoxRenderer.setAttributePointerAt(attrib.tangent, mesh.buffers[FoxVertexBufferType.TANGENTS]);
+			FoxRenderer.setAttributePointerAt(attrib.normal, buffers[FoxVertexBufferType.NORMALS]);
+			FoxRenderer.setAttributePointerAt(attrib.tangent, buffers[FoxVertexBufferType.TANGENTS]);
 		}
 
 		if(attrib.tangent != -1)
-			FoxRenderer.setAttributePointerAt(attrib.tangent, mesh.buffers[FoxVertexBufferType.TANGENTS]);
+			FoxRenderer.setAttributePointerAt(attrib.tangent, buffers[FoxVertexBufferType.TANGENTS]);
 
 		if(attrib.color != -1)
-			FoxRenderer.setAttributePointerAt(attrib.color, mesh.buffers[FoxVertexBufferType.COLORS]);
+			FoxRenderer.setAttributePointerAt(attrib.color, buffers[FoxVertexBufferType.COLORS]);
 
 		if(attrib.boneWeight != -1)
-			FoxRenderer.setAttributePointerAt(attrib.boneWeight, mesh.buffers[FoxVertexBufferType.WEIGHTS]);
+			FoxRenderer.setAttributePointerAt(attrib.boneWeight, buffers[FoxVertexBufferType.WEIGHTS]);
 
 		if(attrib.boneIndex != -1)
-			FoxRenderer.setAttributePointerAt(attrib.boneIndex, mesh.buffers[FoxVertexBufferType.BONE_INDICES]);
+			FoxRenderer.setAttributePointerAt(attrib.boneIndex, buffers[FoxVertexBufferType.BONE_INDICES]);
 
 		// Draw things the OpenGL way
 		@:privateAccess // Shut up haxe everything is okay
@@ -864,31 +866,33 @@ class FoxRenderer {
 
 		__Note 2:__ Instancing operations only works in OpenGL 3.0+
 	**/
-	public static function drawMeshInstanced(context:Context3D, mesh:FoxMesh, shader:FoxShader, count:Int, instanceData:FoxInstanceData) {
-		final indexBuffer = mesh.buffers[FoxVertexBufferType.INDICES];
+	public static function drawMeshInstanced(context:Context3D, mesh:FoxMesh, shader:FoxShader, count:Int, instanceData:FoxInstanceData, lod:Int=0) {
+		final buffers = mesh.getLod(lod);
+		if(buffers == null) return;
+		final indexBuffer = buffers[FoxVertexBufferType.INDICES];
 		var elements = indexBuffer?.count ?? 0;
 		if(elements == 0) return;
 		var gl = context.gl;
 		var attrib = shader.attribIdx;
 
 		// Attributes
-		FoxRenderer.setAttributePointerAt(attrib.position, mesh.buffers[FoxVertexBufferType.VERTICES]);
+		FoxRenderer.setAttributePointerAt(attrib.position, buffers[FoxVertexBufferType.VERTICES]);
 		if(attrib.texCoord != -1) 
-			FoxRenderer.setAttributePointerAt(attrib.texCoord, mesh.buffers[FoxVertexBufferType.UVS]);
+			FoxRenderer.setAttributePointerAt(attrib.texCoord, buffers[FoxVertexBufferType.UVS]);
 
 		if(attrib.normal != -1) {
-			FoxRenderer.setAttributePointerAt(attrib.normal, mesh.buffers[FoxVertexBufferType.NORMALS]);
-			FoxRenderer.setAttributePointerAt(attrib.tangent, mesh.buffers[FoxVertexBufferType.TANGENTS]);
+			FoxRenderer.setAttributePointerAt(attrib.normal, buffers[FoxVertexBufferType.NORMALS]);
+			FoxRenderer.setAttributePointerAt(attrib.tangent, buffers[FoxVertexBufferType.TANGENTS]);
 		}
 
 		if(attrib.color != -1)
-			FoxRenderer.setAttributePointerAt(attrib.color, mesh.buffers[FoxVertexBufferType.COLORS]);
+			FoxRenderer.setAttributePointerAt(attrib.color, buffers[FoxVertexBufferType.COLORS]);
 
 		if(attrib.boneWeight != -1)
-			FoxRenderer.setAttributePointerAt(attrib.boneWeight, mesh.buffers[FoxVertexBufferType.WEIGHTS]);
+			FoxRenderer.setAttributePointerAt(attrib.boneWeight, buffers[FoxVertexBufferType.WEIGHTS]);
 
 		if(attrib.boneIndex != -1)
-			FoxRenderer.setAttributePointerAt(attrib.boneIndex, mesh.buffers[FoxVertexBufferType.BONE_INDICES]);
+			FoxRenderer.setAttributePointerAt(attrib.boneIndex, buffers[FoxVertexBufferType.BONE_INDICES]);
 
 		// Instance data
 		var ID = attrib.instanceData;

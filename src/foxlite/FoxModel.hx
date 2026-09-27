@@ -48,6 +48,15 @@ class FoxModel extends FoxObject #if !foxlite_polymod implements IFoxCullable #e
 	////
 
 	/**
+		The current level of detail for this mesh
+
+		Can be changed to swap LODs at runtime (if the meshes have any)
+
+		This has no effect if the meshes have no LODs
+	**/
+	public var curLod:Int = 0;
+
+	/**
 		Precalculated bounds for all meshes of this model
 
 		Updates when a mesh is added/removed
@@ -197,7 +206,7 @@ class FoxModel extends FoxObject #if !foxlite_polymod implements IFoxCullable #e
 
 	// Just a proxy to make things easier
 	public function renderMesh(mesh:FoxMesh, shader:FoxShader) {
-		if(mesh.buffers[FoxVertexBufferType.INDICES] != null) FoxRenderer.drawMesh(context, mesh, shader);
+		FoxRenderer.drawMesh(context, mesh, shader, curLod);
 	}
 
 	public function isInstanced() {

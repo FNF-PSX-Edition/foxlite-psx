@@ -27,6 +27,8 @@ class FoxMesh {
 		An array containing vertex buffers for this mesh.
 
 		Access them via `buffers[FoxVertexBufferType.<type>]`
+
+		These buffers represent Level of Detail 0
 	**/
 	public var buffers:Array<FoxVertexBuffer> = [
 		null, null, null, null, null, null,
@@ -381,6 +383,10 @@ class FoxMesh {
 	**/
 	@:deprecated public function getBufferByType(type:FoxVertexBufferType):FoxVertexBuffer {
 		return buffers[type];
+	}
+
+	public inline function getLod(lod:Int):Array<FoxVertexBuffer> {
+		return lods[FoxMathUtil.glslClampInt(lod, 0, lods.length-1)];
 	}
 
 	/*

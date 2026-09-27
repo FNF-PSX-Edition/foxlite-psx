@@ -206,7 +206,7 @@ class FoxInstancedModel extends FoxModel {
 	}
 
 	public override function renderMesh(mesh:FoxMesh, shader:FoxShader) {
-		if(instanceCount > 0) FoxRenderer.drawMeshInstanced(context, mesh, shader, instanceCount, instanceData);
+		if(instanceCount > 0) FoxRenderer.drawMeshInstanced(context, mesh, shader, instanceCount, instanceData, curLod);
 	}
 
 	public override function isInstanced() {
