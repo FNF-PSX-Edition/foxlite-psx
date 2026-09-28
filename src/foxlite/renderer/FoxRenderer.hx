@@ -29,10 +29,6 @@ import foxlite.texture.FoxMipFilter;
 import foxlite.texture.FoxWrapMode;
 import foxlite.polyfill.TypedArray;
 
-#if lime_box3d
-import foxlite.physics.FoxPhysicsWorld;
-#end
-
 import lime.graphics.opengl.GL;
 import lime.utils.DataPointer;
 import lime.utils.Float32Array;
@@ -158,6 +154,11 @@ class FoxRenderer {
 
 	public static final onPreDraw:FlxTypedSignalImpl<()->Void> = new FlxTypedSignalImpl();
 	public static final onPostDraw:FlxTypedSignalImpl<()->Void> = new FlxTypedSignalImpl();
+
+	/**
+		Called when `initLibs()` is called
+	**/
+	public static final onInit:FlxTypedSignalImpl<()->Void> = new FlxTypedSignalImpl();
 
 	public static final nextDrawTasks:List<()->Void> = new List();
 
@@ -407,10 +408,7 @@ class FoxRenderer {
 		trace(BoundingBox.__tempBounds);
 		trace(BoundingBox.__tempBounds2);
 		#end
-
-		#if lime_box3d
-		FoxPhysicsWorld.staticInit();
-		#end
+		onInit.dispatch();
 		trace('--------------- Finished Initializing Libs ---------------');
 	}
 

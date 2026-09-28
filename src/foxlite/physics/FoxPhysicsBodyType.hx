@@ -1,6 +1,5 @@
 package foxlite.physics;
 
-#if lime_box3d
 #if !foxlite_polymod abstract #else class #end FoxPhysicsBodyType #if !foxlite_polymod (Int) from Int to Int #end {
 
 	/**
@@ -45,4 +44,3 @@ package foxlite.physics;
 		}
 	}
 }
-#end
