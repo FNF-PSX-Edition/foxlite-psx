@@ -88,8 +88,8 @@ class FoxFramebufferCubemap extends FoxFramebuffer {
 	}
 
 	// Not supported
-	public override function readPixels(x:Int = 0, y:Int = 0, ?width:Int, ?height:Int):UInt8Array {return null; }
-	public override function readDepth(x:Int = 0, y:Int = 0, ?width:Int, ?height:Int):Float32Array {return null; }
+	public override function readPixels(x:Int = 0, y:Int = 0, ?width:Int, ?height:Int, ?output:UInt8Array):UInt8Array {return null; }
+	public override function readDepth(x:Int = 0, y:Int = 0, ?width:Int, ?height:Int, ?output:Float32Array):Float32Array {return null; }
 
 	public override function isCubemap():Bool {
 		return true;
