@@ -181,11 +181,7 @@ class FoxFramebuffer {
 
 		// Allocate space 
 		var buffer = output;
-		if(buffer == null) {
-			var mem:Array<Int> = [];
-			mem.resize(width*height*4);
-			buffer = TypedArray.UInt8Array(mem);
-		}
+		if(buffer == null) buffer = new UInt8Array(width*height*4);
 
 		#if foxlite_polymod
 		#if lime_webgl
@@ -197,7 +193,7 @@ class FoxFramebuffer {
 		#else
 		gl.readPixels(x, y, width, height, gl.RGBA, gl.UNSIGNED_BYTE, buffer);
 		#end
-		
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 		return buffer;
 	}
 
@@ -219,11 +215,7 @@ class FoxFramebuffer {
 
 		// Allocate space 
 		var buffer = output;
-		if(buffer == null) {
-			var mem:Array<Float> = [];
-			mem.resize(width*height*4);
-			buffer = TypedArray.Float32Array(mem);
-		}
+		if(buffer == null) buffer = new Float32Array(width*height*4);
 
 		#if foxlite_polymod
 		#if lime_webgl
@@ -235,7 +227,7 @@ class FoxFramebuffer {
 		#else
 		gl.readPixels(x, y, width, height, gl.DEPTH_COMPONENT, gl.FLOAT, buffer);
 		#end
-
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 		return buffer;
 	}
 	
