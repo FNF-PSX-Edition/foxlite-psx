@@ -30,7 +30,7 @@ precision mediump int;
 
 // ---------- Legacy support for OpenGL 3 ----------
 
-#if __VERSION__ >= 300
+#if __VERSION__ >= 150 || (defined(GL_ES) && __VERSION__ >= 300)
 #define texture2D texture
 #define texture2DLod textureLod
 #define textureCube texture
@@ -42,11 +42,13 @@ precision mediump int;
 
 #ifdef FRAGMENT
 #define varying in
+
 #ifdef FORWARDPLUS
-layout(location = 0) out vec4 _GL_DRAW_BUFFERS[4];
+out vec4 _GL_DRAW_BUFFERS[4];
 #else
-layout(location = 0) out vec4 _GL_DRAW_BUFFERS[1];
+out vec4 _GL_DRAW_BUFFERS[1];
 #endif
+
 #define gl_FragData _GL_DRAW_BUFFERS
 #define gl_FragColor gl_FragData[0]
 #endif

@@ -253,16 +253,23 @@ void mainFrag_basic() {
 
 	#ifdef SKY_REFLECTIONS
 		vec3 dir = reflect(normalize(worldDirection), worldBasis * normalView);
-		//float costheta = -dot(normalize(viewPosition.xyz), normalView);
-		//float fresnel = fresnelSchlick(clamp(costheta, 0.0, 1.0), 0.05);
 		vec4 skyColor = panoramaSky(skyTexture, dir, pow(8.0, roughness)-1.0);
 	#ifdef SKY_RADIANCE
-		vec4 envColor = pow(panoramaSky(skyTexture, dir, float(SKY_RADIANCE_LEVEL)), 1./vec4(4));	
+		vec4 envColor = pow(panoramaSky(skyTexture, worldBasis * normalView, float(SKY_RADIANCE_LEVEL)), 1./vec4(4));	
 		albedo *= envColor;
 	#endif
+		#ifdef FRESNEL
+		vec3 F0 = mix(vec3(0.04), albedo.rgb, metallic);
+		vec3 F = F0 + (1.0 - F0) * pow(1.0 - max(dot(normalView, -normalize(viewPosition.xyz)), 0.0), 5.0);
+		vec3 kD = (1.0 - F) * (1.0 - metallic); // energy conservation
+		albedo.rgb = kD * albedo.rgb + skyColor.rgb * F;
+		#else
 		albedo.rgb = mix(albedo.rgb, skyColor.rgb, clamp(metallic, 0.0, 1.0));
+		#endif
 	#else
-		albedo.rgb *= 1.0 - metallic;
+	 	#ifdef LIGHTING_GLSL
+		albedo.rgb = mix(albedo.rgb, albedo.rgb * ambientLight, clamp(metallic, 0.0, 1.0)); // Fake metalness
+		#endif
 	#endif
 	
 	//}
