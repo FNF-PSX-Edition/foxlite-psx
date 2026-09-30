@@ -13,7 +13,7 @@ import haxe.ds.StringMap;
 import lime.graphics.WebGLRenderContext;
 import lime.math.Vector2;
 import lime.utils.Float32Array;
-import openfl.Assets;
+import lime.utils.Assets;
 import openfl.display3D.Context3D;
 import openfl.display3D.Program3D;
 import openfl.geom.Matrix3D;
@@ -198,24 +198,20 @@ class FoxShader {
 			
 		for(flag in flags) if(!shader.shaderDefines.contains(flag)) shader.shaderDefines.push(flag);
 
-		// Create programs
-		shader.program = shader.context.createProgram(cast 1); // 1 = Context3DProgramFormat.GLSL
+		// Save sources
+		// TODO: Save original sources somewhere, so recompile() actually works
 		shader.__fragSource = frag;
 		shader.__vertSource = vert;
 		shader.__needsCompiling = true;
 
-		// Shadow program
+		// Shadow shader
+		// TODO: same of the above
 		var shadowShader = new FoxShader();
 		var shadowCheck = #if !foxlite_polymod FoxShader.PRAGMA_SHADOW_PROGRAM; #else "#pragma shadow_program_check"; #end 
-		shadowShader.program = shader.context.createProgram(cast 1);
 		shadowShader.__fragSource = StringTools.replace(frag, shadowCheck, "#define SHADOW_PASS");
 		shadowShader.__vertSource = StringTools.replace(vert, shadowCheck, "#define SHADOW_PASS");
 		shadowShader.__needsCompiling = true;
 		shader.shadow = shadowShader;
-
-		// TODO: Defer shader compilation?
-		shader.compile();
-		shadowShader.compile();
 
 		return shader;
 	}
@@ -242,8 +238,8 @@ class FoxShader {
 				source = includes.replace(source, "// Skipped: " + file);
 				continue;
 			}
-			#if debug
-			trace("[FoxLite > FoxShader]: Including shader source: " + file);
+			#if foxlite_verbose
+			FoxLog.log("FoxShader", "Including shader source: " + file);
 			#end
 
 			list.push(file);
@@ -253,7 +249,7 @@ class FoxShader {
 				cache = FoxLoaderUtil.loadText(defPath);
 				// Silly but okay
 				if(cache == null) {
-					trace('[FoxLite > FoxShader]: WARNING! FILE NOT FOUND: $defPath');
+					FoxLog.warning('FoxShader', 'FILE NOT FOUND: $defPath');
 					cache = '// MISSING SOURCE: "$file" ($defPath)';
 				}
 				else FoxCache.shaderIncludes().set(defPath, cache);
@@ -277,13 +273,13 @@ class FoxShader {
 		
 		if(Assets.exists(vert)) vert = Assets.getText(vert);
 		else {
-			trace('[FoxLite > FoxShader]: Vertex source not found for $vert');
+			FoxLog.warning('FoxShader', 'Vertex source not found for $vert');
 			vert = "";
 		}
 
 		if(Assets.exists(frag)) frag = Assets.getText(frag);
 		else {
-			trace('[FoxLite > FoxShader]: Fragment source not found for $frag');
+			FoxLog.warning('FoxShader', 'Fragment source not found for $frag');
 			frag = "";
 		}
 
@@ -291,8 +287,8 @@ class FoxShader {
 
 		var shader = FoxShader.fromSources(vert, frag, flags);
 		shader.assetsKey = name;
-		#if debug
-		trace("[FoxLite > FoxShader]: Add shader to cache: " + name + defHash);
+		#if foxlite_verbose
+		FoxLog.log("FoxShader", "Add shader to cache: " + name + defHash);
 		#end
 		FoxCache.shaders().set(name + defHash, shader);
 		return shader;
@@ -309,6 +305,7 @@ class FoxShader {
 		While the shader isn't compiled, no uniform should be set, else they will be lost.
 	**/
 	public function compile() {
+		if(program == null) program = context.createProgram(cast 1); // 1 = Context3DProgramFormat.GLSL
 		FoxRenderer.uploadFromGLSLProgram3D(program, __vertSource, __fragSource);
 		initCache();
 		__needsCompiling = false;
@@ -643,16 +640,9 @@ class FoxShader {
 	public function setMatrix4(name:String, value:Matrix3D):Void {
 		var location = uniformCache.get(name)?.location;
 		if(location != null) {
-			#if foxlite_polymod
-			context.setProgram(program);
-			context.setProgramConstantsFromMatrix(0, location, value);
-			FoxRenderer.allocationsThisFrame += 1; // Float32Array is not cached...
-			#else
-			// Faster method in native
 			FoxRenderer.useShader(this);
-			for(i in 0...16) __tmpMatrix[i] = value.rawData[i];
+			for(i in 0...16) __tmpMatrix[i] = value.rawData.__array[i];
 			gl.uniformMatrix4fv(cast location, false, __tmpMatrix);
-			#end
 		}
 	}
 

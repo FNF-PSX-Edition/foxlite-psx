@@ -169,9 +169,10 @@ class FoxFramebuffer {
 		@param y The Y coordinate of the region
 		@param width The Width of the region
 		@param height The Height of the region
+		@param output (Optional) If set, data will be written to this buffer
 
 	**/
-	public function readPixels(x:Int=0, y:Int=0, ?width:Int, ?height:Int):UInt8Array {
+	public function readPixels(x:Int=0, y:Int=0, ?width:Int, ?height:Int, ?output:UInt8Array):UInt8Array {
 		var gl = context.gl;
 		gl.bindFramebuffer(gl.FRAMEBUFFER, glTexture.__glFramebuffer);
 
@@ -179,9 +180,8 @@ class FoxFramebuffer {
 		if(height == null) height = glTexture.__height;
 
 		// Allocate space 
-		var mem:Array<Int> = [];
-		mem.resize(width*height*4);
-		var buffer = TypedArray.UInt8Array(mem);
+		var buffer = output;
+		if(buffer == null) buffer = new UInt8Array(width*height*4);
 
 		#if foxlite_polymod
 		#if lime_webgl
@@ -193,7 +193,7 @@ class FoxFramebuffer {
 		#else
 		gl.readPixels(x, y, width, height, gl.RGBA, gl.UNSIGNED_BYTE, buffer);
 		#end
-		
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 		return buffer;
 	}
 
@@ -206,7 +206,7 @@ class FoxFramebuffer {
 
 		@returns a `Float32Array` containing depth values
 	**/
-	public function readDepth(x:Int=0, y:Int=0, ?width:Int, ?height:Int):Float32Array {
+	public function readDepth(x:Int=0, y:Int=0, ?width:Int, ?height:Int, ?output:Float32Array):Float32Array {
 		var gl = context.gl;
 		gl.bindFramebuffer(gl.FRAMEBUFFER, glTexture.__glFramebuffer);
 
@@ -214,9 +214,8 @@ class FoxFramebuffer {
 		if(height == null) height = glTexture.__height;
 
 		// Allocate space 
-		var mem:Array<Float> = [];
-		mem.resize(width*height*4);
-		var buffer = TypedArray.Float32Array(mem);
+		var buffer = output;
+		if(buffer == null) buffer = new Float32Array(width*height*4);
 
 		#if foxlite_polymod
 		#if lime_webgl
@@ -228,7 +227,7 @@ class FoxFramebuffer {
 		#else
 		gl.readPixels(x, y, width, height, gl.DEPTH_COMPONENT, gl.FLOAT, buffer);
 		#end
-
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 		return buffer;
 	}
 	

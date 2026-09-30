@@ -55,7 +55,8 @@ class HScriptCompatMacro {
 			"foxlite.animation.layering.FoxSubtractNode",
 			"foxlite.culling.BoundingBox",
 			"foxlite.culling.FrustumPlanes",
-			"foxlite.extras.FlxFox3DSprite"
+			"foxlite.extras.FlxFox3DSprite",
+			"foxlite.FoxShader"
 		]) {
 			haxe.macro.Compiler.addGlobalMetadata(fox, "@:build(foxlite.macro.HScriptCompatMacro.build_VectorAccess())", true, true, false);
 		}

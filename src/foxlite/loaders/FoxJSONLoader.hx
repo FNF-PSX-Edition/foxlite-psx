@@ -58,14 +58,14 @@ class FoxJSONLoader {
 		for(model in modelData) {
 			var material:FoxMaterial = null;
 			if(model.material != null) {
-				#if debug
-				trace("[FoxLite > FoxJSONLoader]: Loading material file: " + model.material.split(":")[0]);
+				#if foxlite_verbose
+				FoxLog.log("FoxJSONLoader", "Loading material file: " + model.material.split(":")[0]);
 				#end
 				material = FoxMaterial.fromJSON(path + model.material); // Adds to cache automatically
-				if(material != null) materials.set(material.name, material);
-				#if debug
-				else trace("[FoxLite > FoxMaterial]: Warning: material not found!! " + model.material);
-				#end
+				if(material == null) {
+					FoxLog.warning("FoxMaterial", "material not found!! " + model.material);
+				}
+				else materials.set(material.name, material);
 			}
 
 			var mesh = new FoxMesh();
@@ -235,7 +235,7 @@ class FoxJSONLoader {
 
 			if(Std.isOfType(data.duration, Float) || Std.isOfType(data.duration, Int)) anim.duration = Math.max(data.duration, 0);
 			else {
-				trace('[FoxLite > FoxJSONLoader]: Warning! Animation "$animName" duration is invalid. Keyframe times will be used instead.');
+				FoxLog.warning('FoxJSONLoader', 'Animation "$animName" duration is invalid. Keyframe times will be used instead.');
 				useMaxFrameTimes = true;
 			}
 			if(Std.isOfType(data.loop, Bool)) anim.loop = data.loop;
@@ -244,7 +244,7 @@ class FoxJSONLoader {
 				var tData:Dynamic = Reflect.field(data.tracks, trackName);
 				var tType:Int = Std.isOfType(tData.type, String) ? FoxTrackType.fromString(tData.type) : (Std.isOfType(tData.type, Int) || Std.isOfType(tData.type, Float) ? Std.int(tData.type) : -1);
 				if(tType < 0) {
-					trace('[FoxLite > FoxJSONLoader]: Warning! Track "$trackName" of animation "$animName" has an invalid type, skipping.');
+					FoxLog.warning('FoxJSONLoader', 'Track "$trackName" of animation "$animName" has an invalid type, skipping.');
 					continue;
 				}
 				var track:FoxAnimationTrack<Any> = anim.addTrack(trackName, tType);

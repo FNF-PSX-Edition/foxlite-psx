@@ -72,8 +72,8 @@ class FoxCache {
 	}
 
 	public function freeResources():Void {
-		#if debug
-		trace("[FoxLite > FoxCache]: CLEARING CACHE!");
+		#if foxlite_verbose
+		FoxLog.log("FoxCache", "CLEARING CACHE!");
 		#end
 		for(r in _texture) r?.destroy();
 		for(r in _shaders) r?.destroy();
@@ -89,6 +89,54 @@ class FoxCache {
 		_meshes.clear();
 		_animationLibs.clear();
 		_skins.clear();
+	}
+
+	/**
+		Returns the loaded textures alongside the textures total
+
+		This only counts textures registered in the cache
+	**/
+	public static function texturesLoaded():{loaded:Array<FoxTexture>, total:Int} {
+		var data = {loaded: [], total: 0};
+		for(t in textures()) {
+			if(t.loaded) data.loaded.push(t);
+			data.total++;
+		}
+		return data;
+	}
+
+	/**
+		Returns the loaded meshes alongside the total of meshes
+
+		This only counts meshes registered in the cache
+	**/
+	public static function meshesLoaded():{loaded:Array<Array<FoxMesh>>, total:Int} {
+		var data = {loaded: [], total: 0};
+		for(c in meshes()) {
+			var loaded = true;
+			for(m in c) if(!m.loaded) {
+				loaded = false;
+				break;
+			}
+			if(loaded) data.loaded.push(c);
+			data.total++;
+		}
+		return data;
+	}
+
+
+	/**
+		Returns the shaders that have been compiled alongside all shaders
+
+		This only counts shaders registered in the cache
+	**/
+	public static function shadersCompiled():{compiled:Array<FoxShader>, total:Int} {
+		var data = {compiled: [], total: 0};
+		for(t in shaders()) {
+			if(!t.__needsCompiling) data.compiled.push(t);
+			data.total++;
+		}
+		return data;
 	}
 
 	public static function cleanup() {

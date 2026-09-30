@@ -112,7 +112,7 @@ class FoxTextureBuffer extends FoxTexture {
 		final typeString = "FLOAT";
 
 		if(formatString == "32F" || formatString == "") {
-			trace("[Foxlite > FoxTextureBuffer]: Invalid buffer format!");
+			FoxLog.warning("FoxTextureBuffer", "Invalid buffer format!");
 			return;
 		}
 
@@ -120,20 +120,31 @@ class FoxTextureBuffer extends FoxTexture {
 		_glFormat = texFmtData.format;
 		_glType = Reflect.field(gl, typeString.toUpperCase());
 
-		glTexture = FoxRenderer.createTextureStorage(length, 1, formatString, typeString);
+		function task() {
+			glTexture = FoxRenderer.createTextureStorage(length, 1, formatString, typeString);
+			// Update texture state
+			FoxRenderer.useTexture(0, this);
+		}
+		
+		if(FoxRenderer.forceSyncLoading)
+			task();
+		else 
+			FoxRenderer.runTaskAtNextDraw(task);
 		pixelSize.x = 1.0 / length;
 
-		// Update texture state
 		__paramsNeedUpdate = true;
-		FoxRenderer.useTexture(0, this);
 	}
 
 	/**
 		Uploads the texture buffer to the GPU.
 
 		Call this when you're done writing data to the buffer.
+
+		__Note:__ The data won't update if there's no gpu texture attached, but
+		will be retained on the buffer for the next update call.
 	**/
 	public inline function updateGPU() {
+		if(!loaded) return;
 		var gl = #if foxlite_polymod GL; #else context.gl; #end // Use lime GL for HScript
 		
 		#if (js && html5)

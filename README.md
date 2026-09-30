@@ -30,11 +30,17 @@ Many things can change throughout its lifecycle, many things are way too simple 
 - [x] Attribute system rework (allow for custom attribute buffer types, [glTF 2.0 spec](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes))
 - [ ] Cubemap rendering for passes and shadows as well (Point light and Area light)
 - [ ] Use a general texture projector system for shadows (reduces varying count for old GPUs)
-- [ ] LOD system (tessellation is not available, so it has to be done manually)
+- [x] LOD system (tessellation is not available, so it has to be done manually)
+
+	- Note: Currently, you need to supply your own LODs
 - [ ] Shape keys support for gltf models
-- [ ] Simplify custom shaders (QOL improvements like function overriding)
-- [ ] Frustum culling
-- [ ] Physics engine implementation (considered: [box3d](https://github.com/erincatto/box3d))
+- [x] ~~Simplify custom shaders (QOL improvements like function overriding)~~
+
+	- Note: This is probably going to be delayed, don't feel like making a glsl assembler for now.
+- [x] (80% DONE) Frustum culling
+
+	- Note: Two optimizations i'd like to add: BVH and threaded culling before i consider this complete.
+- [⏳] (WIP) Physics engine implementation (considered: [box3d](https://github.com/erincatto/box3d))
 - [ ] Away3D's AWD1/2 models support
 - [ ] Foxlite Godot export plugin
 

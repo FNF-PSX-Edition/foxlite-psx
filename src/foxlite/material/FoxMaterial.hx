@@ -8,6 +8,7 @@ import foxlite.loaders.FoxMTLLoader;
 import foxlite.material.FoxBlendMode;
 import foxlite.material.FoxDepthCompareMode;
 import foxlite.material.FoxTriangleFace;
+import foxlite.lights.FoxLightData;
 import foxlite.loaders.FoxJSONLoader;
 import foxlite.renderer.FoxRenderer;
 import foxlite.stencil.FoxStencilAction;
@@ -57,6 +58,13 @@ class FoxMaterial {
 	public var environment:FoxEnvironment;
 
 	/**
+		A custom light data for this material
+
+		This allows to use custom lights per-material!
+	**/
+	public var lightData:FoxLightData;
+
+	/**
 		This controls the rendering order of materials.
 
 		Lower priority means the model will be rendered before other models.
@@ -76,7 +84,9 @@ class FoxMaterial {
 	public var lineWidth:Float = 1;
 
 	public function new(?shader_:FoxShader) {
+		FoxRenderer.mutex.acquire();
 		FoxMaterial.__GLOBAL_ID += 1;
+		FoxRenderer.mutex.release();
 		__id = __GLOBAL_ID;
 
 		// Write default uniforms
@@ -259,6 +269,7 @@ class FoxMaterial {
 		mat.lineWidth = lineWidth;
 		mat.stencil = stencil;
 		mat.environment = environment;
+		mat.lightData = lightData;
 		return mat;
 	}
 

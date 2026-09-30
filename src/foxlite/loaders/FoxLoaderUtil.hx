@@ -1,7 +1,7 @@
 package foxlite.loaders;
 
 import haxe.Json;
-import openfl.utils.Assets;
+import lime.utils.Assets;
 
 class FoxLoaderUtil {
 

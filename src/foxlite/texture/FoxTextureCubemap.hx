@@ -36,9 +36,7 @@ class FoxTextureCubemap extends FoxTexture {
 
 	public override function resize(width:Int, height:Int):FoxTextureCubemap {
 		if(__format == null || __type == null) {
-			#if debug
-			trace("[FoxLite > FoxTexture]: Wrapped/Loaded textures cannot be resized!!!");
-			#end
+			FoxLog.warning("FoxTexture", "Wrapped/Loaded textures cannot be resized!!!");
 			return this;
 		}
 		glTexture?.dispose();

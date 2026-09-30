@@ -28,6 +28,7 @@ class FoxPostProcess extends FoxModel {
 		var quad = new FoxQuadMesh(2, 2, _material); // Origin is at 0,0
 		addMesh(quad);
 		renderPriority = priority;
+		frustumCulling = false;
 	}
 
 	public override function update(dt:Float) {} // Skip transform operations

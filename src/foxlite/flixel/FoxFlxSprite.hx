@@ -55,7 +55,7 @@ class FoxFlxSprite extends FoxModel {
 	/**
 		A matrix that's used to store flixel frame offsets (if present)
 	**/
-	var _matrix:FlxMatrix;
+	var _matrix:FlxMatrix = new FlxMatrix();
 
 	// Shortcuts
 	public var material(get, set):FoxMaterial;
@@ -203,7 +203,6 @@ class FoxFlxSprite extends FoxModel {
 		else { // UV Animated sprite
 			var r = sprite.frame.frame;
 			if(__prevFrame != sprite.frame.name || (r != null && __prevRect != null && !r.equals(__prevRect))) {
-				if(_matrix == null) _matrix = new FlxMatrix();
 				calculateMesh();
 				__prevFrame = sprite.frame.name;
 				__prevRect = r;
@@ -215,17 +214,16 @@ class FoxFlxSprite extends FoxModel {
 	// From Flixel and Codename Engine
 	function calculateOffsetMatrix() {
 		var angle = sprite.frame.angle;
-		sprite.frame.prepareMatrix(_matrix, angle, sprite.flipX, sprite.flipY);
+		sprite.frame.prepareMatrix(_matrix, angle, false, false);
 		if (angle == -90) {
-			final srcX = sprite.frame.sourceSize.x;
 			final srcY = sprite.frame.sourceSize.y;
-			var aspect = srcX / srcY;
-			_matrix.translate(-srcX/aspect, srcY*aspect);
+			_matrix.translate(-sprite.origin.y-srcY, -sprite.origin.x);
 		}
-		_matrix.translate(-sprite.origin.x, -sprite.origin.y);
+		else _matrix.translate(-sprite.origin.x, -sprite.origin.y);
 		#if cne
 		_matrix.translate(-sprite.frameOffset.x, -sprite.frameOffset.y);
 		#end
+		
 	}
 
 	/**

@@ -37,9 +37,7 @@ class FoxSubtractNode extends FoxBaseNode {
 		if(inA != null && inB != null) for(name=>output in data) {
 			var trackA = inA.data.get(name);
 			var trackB = inB.data.get(name);
-			if(trackB == null) trackB = trackA; // Allow passtrough if there's no input B
-			if(trackA == null) trackA = trackB; // Use B's data if A's missing (add null)
-			if(trackA == null && trackB == null) continue;
+			if(trackA == null || trackB == null) continue;
 
 			// I'm in a rush AAAAAAAAAAAA
 			if(trackA.type == trackB.type) switch(output.type) {

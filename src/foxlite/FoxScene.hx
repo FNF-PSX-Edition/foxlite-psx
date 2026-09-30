@@ -21,9 +21,8 @@ import haxe.ds.StringMap;
 import lime.math.Vector2;
 import openfl.display3D.Context3D;
 import openfl.geom.Vector3D;
-#if lime_box3d
-import foxlite.physics.FoxPhysicsWorld;
-#end
+
+import foxlite.physics.FoxPhysicsWorldBase;
 
 class FoxScene extends FoxExtendableSprite {
 
@@ -67,23 +66,19 @@ class FoxScene extends FoxExtendableSprite {
 	public var environment:FoxEnvironment = new FoxEnvironment();
 	
 	/**
-		The Box3D physics world container for this scene, this handles all physics
+		The physics world container for this scene, this handles all physics
 		related functions
-
-		__Note:__ Only available if [lime-box3d](https://github.com/TheZoroForce240/lime-box3d) is installed
 	**/
-	#if lime_box3d
-	public var physicsWorld(default, set):FoxPhysicsWorld;
+	public var physicsWorld(default, set):FoxPhysicsWorldBase;
 
-	function set_physicsWorld(v:FoxPhysicsWorld):FoxPhysicsWorld {
+	function set_physicsWorld(v:FoxPhysicsWorldBase):FoxPhysicsWorldBase {
+		if(v == null) {
+			if(this.physicsWorld != null) this.physicsWorld.onPhysicsUpdate = null;
+		}
+		else v.onPhysicsUpdate = foxGroup.physicsUpdate;
 		this.physicsWorld = v;
-		if(v == null) return v;
-		v.onPhysicsUpdate = foxGroup.physicsUpdate;
 		return v;
 	}
-	#else
-	public var physicsWorld:Dynamic;
-	#end
 
 	/**
 	* An array of `BalancedTree` containing sorted `FoxDrawTree` for drawing.

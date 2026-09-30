@@ -113,7 +113,7 @@ class FoxFunkinSprite extends FoxFlxSprite {
 		if(__prevGraphicWidth != graphic.width || __prevGraphicHeight != graphic.height) {
 			__prevGraphicWidth = graphic.width;
 			__prevGraphicHeight = graphic.height;
-			@:privateAccess _matrix = renderTexture._matrix;
+			@:privateAccess _matrix.copyFrom(renderTexture._matrix);
 			calculateMesh();
 		}
 	}

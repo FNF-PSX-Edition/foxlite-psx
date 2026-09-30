@@ -4,6 +4,7 @@ import EReg;
 import Reflect;
 import StringTools;
 import StringBuf;
+import haxe.ds.List;
 import haxe.ds.StringMap;
 import foxlite.FoxCache;
 import foxlite.FoxShader;
@@ -28,10 +29,6 @@ import foxlite.texture.FoxMipFilter;
 import foxlite.texture.FoxWrapMode;
 import foxlite.polyfill.TypedArray;
 
-#if lime_box3d
-import foxlite.physics.FoxPhysicsWorld;
-#end
-
 import lime.graphics.opengl.GL;
 import lime.utils.DataPointer;
 import lime.utils.Float32Array;
@@ -45,6 +42,10 @@ import flixel.FlxG;
 import lime.utils.DataPointer;
 #end
 
+#if (target.threaded && sys)
+import sys.thread.Mutex;
+#end
+
 typedef FoxGLExtensions = {
 	?anisotropic:Dynamic,
 	?drawBuffersEXT:Dynamic, // WebGL 1
@@ -52,14 +53,25 @@ typedef FoxGLExtensions = {
 	?textureFloat:Dynamic,
 	?textureHalfFloat:Dynamic,
 	?elementIndexUint:Dynamic, // WebGL 1
-	?instancedArrays:Dynamic // WebGL 1 / ES 2
+	?instancedArrays:Dynamic, // WebGL 1 / ES 2
+	?textureCompression:Dynamic,
+	// Compressed textures
+	?astc:Dynamic,
+	// S3TC
+	?s3tc:Dynamic,
+	?s3tc_srgb:Dynamic,
+	?rgtc:Dynamic,
+	?bptc:Dynamic,
+	// Android
+	?etc1:Dynamic, // gles2
+	?etc2:Dynamic  // gles3
 };
 
 // TODO: Make this a singleton so we don't use this many static vars
 class FoxRenderer {
 
 	public static final BUILD_NAME = "Beta";
-	public static final VERSION = "0.2.1";
+	public static final VERSION = "0.3.0";
 
 	public static var frameCount:Int = 0;
 	public static var drawCalls:Int = 0;
@@ -123,6 +135,15 @@ class FoxRenderer {
 	public static var preserveGLBufferData:Bool = false;
 
 	/**
+		If enabled, textures will be loaded synchronously
+
+		This might have issues in HTML5 as lime only supports async loading
+	**/
+	public static var forceSyncLoading:Bool = false;
+
+	public static var compressedTexturesSupported:Bool = false;
+
+	/**
 		If greater than 0, forces the renderer to render using `GL.LINES` with the specified width
 	**/
 	public static var debugWireframe:Float = 0.0;
@@ -133,6 +154,19 @@ class FoxRenderer {
 
 	public static final onPreDraw:FlxTypedSignalImpl<()->Void> = new FlxTypedSignalImpl();
 	public static final onPostDraw:FlxTypedSignalImpl<()->Void> = new FlxTypedSignalImpl();
+
+	/**
+		Called when `initLibs()` is called
+	**/
+	public static final onInit:FlxTypedSignalImpl<()->Void> = new FlxTypedSignalImpl();
+
+	public static final nextDrawTasks:List<()->Void> = new List();
+
+	#if (target.threaded && sys)
+	public static final mutex:Mutex = new Mutex();
+	#else
+	public static final mutex = {acquire: () -> {}, tryAcquire:()->{return true;}, release: () -> {}}; // dummy
+	#end
 
 	/**
 		Missing texture placeholder.
@@ -167,13 +201,13 @@ class FoxRenderer {
 		trace(BUILD_NAME, VERSION, renderContext, frameCount, drawCalls, verticesDrawn, stateSwitches, __blendMode, 
 			__depthTest, __shader, __stencilTest, renderMode, debugWireframe, mustRebuildDrawGroups, 
 			renderedInstances, onPreDraw, onPostDraw, __indexBuffer, __scissorTest, glDeviceName, MISSING_TEXTURE, BLACK_PIXEL,
-			MISSING_MATERIAL, MISSING_SHADER, initialized, __target, calculateMotionVectors, extensions, maxAnisotropy
+			MISSING_MATERIAL, MISSING_SHADER, initialized, __target, calculateMotionVectors, extensions, maxAnisotropy, compressedTexturesSupported
 		);
 		#end
 		
 		FoxRenderer.renderContext = '${window.context.type}'.toUpperCase();
 		FoxRenderer.glDeviceName = gl.getParameter(gl.RENDERER);
-		trace('[FoxLite > FoxRenderer]: lime is ${renderContext} (${Std.string(GL.context)}):\n    - Shader model: ${GL.getParameter(context.gl.SHADING_LANGUAGE_VERSION)}\n    - Device: $glDeviceName');
+		FoxLog.log('FoxRenderer', 'lime is ${renderContext} (${Std.string(GL.context)}):\n    - Shader model: ${GL.getParameter(context.gl.SHADING_LANGUAGE_VERSION)}\n    - Device: $glDeviceName');
 	
 		// Activate extensions
 		extensions.drawBuffersEXT = GL.getExtension("ARB_draw_buffers")
@@ -204,15 +238,57 @@ class FoxRenderer {
 								  ?? GL.getExtension("ARB_instanced_arrays")
 								  ?? GL.getExtension("ANGLE_instanced_arrays");
 
-		trace('[FoxLite > FoxRenderer]: Texture Anisotropy ${extensions.anisotropic == null ?  "not" : "is"} supported.');
+		extensions.textureCompression = GL.getExtension("ARB_texture_compression");
+
+		// These though, we do need em
+		extensions.astc = GL.getExtension("KHR_texture_compression_astc_ldr")
+					   ?? GL.getExtension("OES_texture_compression_astc")
+					   ?? GL.getExtension("WEBGL_compressed_texture_astc");
+
+		extensions.s3tc = GL.getExtension("EXT_texture_compression_s3tc")
+					   ?? GL.getExtension("WEBGL_compressed_texture_s3tc")
+					   ?? GL.getExtension("MOZ_WEBGL_compressed_texture_s3tc")
+					   ?? GL.getExtension("WEBKIT_WEBGL_compressed_texture_s3tc");
+
+		extensions.s3tc_srgb = GL.getExtension("EXT_texture_compression_s3tc_srgb")
+		 				    ?? GL.getExtension("WEBGL_compressed_texture_s3tc_srgb")
+		 			   		?? GL.getExtension("MOZ_WEBGL_compressed_texture_s3tc_srgb")
+		 			   		?? GL.getExtension("WEBKIT_WEBGL_compressed_texture_s3tc_srgb");
+		
+		extensions.rgtc = GL.getExtension("ARB_texture_compression_rgtc")
+					   ?? GL.getExtension("EXT_texture_compression_rgtc");
+
+		extensions.bptc = GL.getExtension("ARB_texture_compression_bptc")
+					   ?? GL.getExtension("EXT_texture_compression_bptc");
+
+		extensions.etc1 = GL.getExtension("WEBGL_compressed_texture_etc1")
+					   ?? GL.getExtension("OES_compressed_ETC1_RGB8_texture");
+
+		extensions.etc2 = GL.getExtension("WEBGL_compressed_texture_etc");
+		#if (android && lime_opengles)
+		// Polyfill
+		extensions.etc2 ??= {
+			COMPRESSED_RGB8_ETC2: 37492,
+			COMPRESSED_RGBA8_ETC2_EAC: 37496
+		};
+		#end
+
+		FoxRenderer.compressedTexturesSupported = 
+		  !(extensions.s3tc == null 
+		 && extensions.s3tc_srgb == null 
+		 && extensions.bptc == null 
+		 && extensions.astc == null
+		 && extensions.etc1 == null);
+
+		FoxLog.log('FoxRenderer', 'Texture Anisotropy ${extensions.anisotropic == null ?  "not" : "is"} supported.');
 
 		var extTxt = new StringBuf();
-		extTxt.add("[FoxLite > FoxRenderer]: Active Extensions: ");
+		extTxt.add("Active Extensions: ");
 		for(extName in Reflect.fields(extensions)) {
 			var ext = Reflect.field(extensions, extName);
 			if(ext != null) extTxt.add('${Std.string(ext)}  ');
 		}
-		trace(extTxt.toString());
+		FoxLog.log("FoxRenderer", extTxt.toString());
 
 		// Initialize missing texture
 		MISSING_TEXTURE = FoxTexture.create(2, 2, "rgba", "UNSIGNED_SHORT_4_4_4_4");
@@ -332,10 +408,7 @@ class FoxRenderer {
 		trace(BoundingBox.__tempBounds);
 		trace(BoundingBox.__tempBounds2);
 		#end
-
-		#if lime_box3d
-		FoxPhysicsWorld.staticInit();
-		#end
+		onInit.dispatch();
 		trace('--------------- Finished Initializing Libs ---------------');
 	}
 
@@ -345,6 +418,12 @@ class FoxRenderer {
 
 	public static function begin() {
 		onPreDraw.dispatch();
+		if(nextDrawTasks.length > 0) {
+			mutex.acquire();
+			for(task in nextDrawTasks) task();
+			nextDrawTasks.clear();
+			mutex.release();
+		}
 		// Static contexts are still weird in HScript (VS 0.8.4), so we still need to use the containing class.
 		FoxRenderer.drawCalls = 0;
 		FoxRenderer.verticesDrawn = 0;
@@ -365,7 +444,7 @@ class FoxRenderer {
 		context.setRenderToBackBuffer();
 		
 		// Default blending
-		FoxRenderer.setBlendMode(context, FoxBlendMode.MIX, true);
+		FoxRenderer.setBlendMode(context, FoxBlendMode.PREMULTIPLIED_ALPHA, true);
 		// No depth test (important!)
 		context.setDepthTest(false, cast 0);
 		context.setCulling(cast 3);
@@ -382,6 +461,18 @@ class FoxRenderer {
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, FoxRenderer.__indexBuffer);
 
 		FoxRenderer.mustRebuildDrawGroups = false;
+	}
+
+	/**
+		Schedules a task to be performed when `onPreDraw` is dispatched, the
+		task is removed once it finished executing.
+
+		This can be called from threads to sync GL stuff
+	**/
+	public inline static function runTaskAtNextDraw(task:()->Void) {
+		mutex.acquire();
+		nextDrawTasks.add(task);
+		mutex.release();
 	}
 
 	public static function generateMipmap(context:Context3D, texture:FoxTexture) {
@@ -434,6 +525,11 @@ class FoxRenderer {
 
 	public inline static function useShader(shader:FoxShader) {
 		if(FoxRenderer.__shader != shader) {
+
+			// Compile shaders
+			if(shader.__needsCompiling) shader.compile();
+			if(shader?.shadow?.__needsCompiling == true) shader.shadow.compile();
+
 			GL.useProgram(shader.program.__glProgram);
 			FoxRenderer.__shader = FoxRenderer.frameCount == 0 ? null : shader; // Fix uniforms not updating before the renderer starts
 		}
@@ -720,34 +816,36 @@ class FoxRenderer {
 	/**
 		Renders a mesh, simple as that! Render pipeline must be set up for this.
 	**/
-	public static function drawMesh(context:Context3D, mesh:FoxMesh, shader:FoxShader) {
-		final indexBuffer = mesh.buffers[FoxVertexBufferType.INDICES];
+	public static function drawMesh(context:Context3D, mesh:FoxMesh, shader:FoxShader, lod:Int=0) {
+		final buffers = mesh.getLod(lod);
+		if(buffers == null) return;
+		final indexBuffer = buffers[FoxVertexBufferType.INDICES];
 		var elements = indexBuffer?.count ?? 0;
 		if(elements == 0) return;
 		var gl = context.gl;
 		var attrib = shader.attribIdx;
 
 		// Attributes
-		FoxRenderer.setAttributePointerAt(attrib.position, mesh.buffers[FoxVertexBufferType.VERTICES]);
+		FoxRenderer.setAttributePointerAt(attrib.position, buffers[FoxVertexBufferType.VERTICES]);
 		if(attrib.texCoord != -1) 
-			FoxRenderer.setAttributePointerAt(attrib.texCoord, mesh.buffers[FoxVertexBufferType.UVS]);
+			FoxRenderer.setAttributePointerAt(attrib.texCoord, buffers[FoxVertexBufferType.UVS]);
 
 		if(attrib.normal != -1) {
-			FoxRenderer.setAttributePointerAt(attrib.normal, mesh.buffers[FoxVertexBufferType.NORMALS]);
-			FoxRenderer.setAttributePointerAt(attrib.tangent, mesh.buffers[FoxVertexBufferType.TANGENTS]);
+			FoxRenderer.setAttributePointerAt(attrib.normal, buffers[FoxVertexBufferType.NORMALS]);
+			FoxRenderer.setAttributePointerAt(attrib.tangent, buffers[FoxVertexBufferType.TANGENTS]);
 		}
 
 		if(attrib.tangent != -1)
-			FoxRenderer.setAttributePointerAt(attrib.tangent, mesh.buffers[FoxVertexBufferType.TANGENTS]);
+			FoxRenderer.setAttributePointerAt(attrib.tangent, buffers[FoxVertexBufferType.TANGENTS]);
 
 		if(attrib.color != -1)
-			FoxRenderer.setAttributePointerAt(attrib.color, mesh.buffers[FoxVertexBufferType.COLORS]);
+			FoxRenderer.setAttributePointerAt(attrib.color, buffers[FoxVertexBufferType.COLORS]);
 
 		if(attrib.boneWeight != -1)
-			FoxRenderer.setAttributePointerAt(attrib.boneWeight, mesh.buffers[FoxVertexBufferType.WEIGHTS]);
+			FoxRenderer.setAttributePointerAt(attrib.boneWeight, buffers[FoxVertexBufferType.WEIGHTS]);
 
 		if(attrib.boneIndex != -1)
-			FoxRenderer.setAttributePointerAt(attrib.boneIndex, mesh.buffers[FoxVertexBufferType.BONE_INDICES]);
+			FoxRenderer.setAttributePointerAt(attrib.boneIndex, buffers[FoxVertexBufferType.BONE_INDICES]);
 
 		// Draw things the OpenGL way
 		@:privateAccess // Shut up haxe everything is okay
@@ -766,31 +864,33 @@ class FoxRenderer {
 
 		__Note 2:__ Instancing operations only works in OpenGL 3.0+
 	**/
-	public static function drawMeshInstanced(context:Context3D, mesh:FoxMesh, shader:FoxShader, count:Int, instanceData:FoxInstanceData) {
-		final indexBuffer = mesh.buffers[FoxVertexBufferType.INDICES];
+	public static function drawMeshInstanced(context:Context3D, mesh:FoxMesh, shader:FoxShader, count:Int, instanceData:FoxInstanceData, lod:Int=0) {
+		final buffers = mesh.getLod(lod);
+		if(buffers == null) return;
+		final indexBuffer = buffers[FoxVertexBufferType.INDICES];
 		var elements = indexBuffer?.count ?? 0;
 		if(elements == 0) return;
 		var gl = context.gl;
 		var attrib = shader.attribIdx;
 
 		// Attributes
-		FoxRenderer.setAttributePointerAt(attrib.position, mesh.buffers[FoxVertexBufferType.VERTICES]);
+		FoxRenderer.setAttributePointerAt(attrib.position, buffers[FoxVertexBufferType.VERTICES]);
 		if(attrib.texCoord != -1) 
-			FoxRenderer.setAttributePointerAt(attrib.texCoord, mesh.buffers[FoxVertexBufferType.UVS]);
+			FoxRenderer.setAttributePointerAt(attrib.texCoord, buffers[FoxVertexBufferType.UVS]);
 
 		if(attrib.normal != -1) {
-			FoxRenderer.setAttributePointerAt(attrib.normal, mesh.buffers[FoxVertexBufferType.NORMALS]);
-			FoxRenderer.setAttributePointerAt(attrib.tangent, mesh.buffers[FoxVertexBufferType.TANGENTS]);
+			FoxRenderer.setAttributePointerAt(attrib.normal, buffers[FoxVertexBufferType.NORMALS]);
+			FoxRenderer.setAttributePointerAt(attrib.tangent, buffers[FoxVertexBufferType.TANGENTS]);
 		}
 
 		if(attrib.color != -1)
-			FoxRenderer.setAttributePointerAt(attrib.color, mesh.buffers[FoxVertexBufferType.COLORS]);
+			FoxRenderer.setAttributePointerAt(attrib.color, buffers[FoxVertexBufferType.COLORS]);
 
 		if(attrib.boneWeight != -1)
-			FoxRenderer.setAttributePointerAt(attrib.boneWeight, mesh.buffers[FoxVertexBufferType.WEIGHTS]);
+			FoxRenderer.setAttributePointerAt(attrib.boneWeight, buffers[FoxVertexBufferType.WEIGHTS]);
 
 		if(attrib.boneIndex != -1)
-			FoxRenderer.setAttributePointerAt(attrib.boneIndex, mesh.buffers[FoxVertexBufferType.BONE_INDICES]);
+			FoxRenderer.setAttributePointerAt(attrib.boneIndex, buffers[FoxVertexBufferType.BONE_INDICES]);
 
 		// Instance data
 		var ID = attrib.instanceData;
@@ -894,18 +994,7 @@ class FoxRenderer {
 	**/
 	public static function createTextureStorage(width:Int, height:Int, format:String="rgba", type:String="unsigned_byte"):Texture {
 		var gl = context.gl;
-
-		// Create dummy texture object
-		FoxRenderer.allocationsThisFrame += 2;
-		@:privateAccess var tex = new Texture(context, 2, 2, cast 1, false, 0);
-
-		// Cleanup
-		tex.dispose();
-		
-		// Now setup our texture
-		tex.__width = width;
-		tex.__height = height;
-
+		var tex = createOpenFLTemplateTexture(width, height);
 		// Create texture with our format to be bound to a framebuffer
 
 		var data = FoxRenderer.getTextureFormat(format);
@@ -929,14 +1018,7 @@ class FoxRenderer {
 
 	public static function createTextureCubemapStorage(size:Int, format:String="rgba", type:String="unsigned_byte"):CubeTexture {
 		var gl = context.gl;
-
-		FoxRenderer.allocationsThisFrame += 2;
-		@:privateAccess var tex = new CubeTexture(context, 2, cast 1, false, 0);
-		tex.dispose();
-		
-		// Now setup our texture
-		tex.__width = size;
-		tex.__height = size;
+		var tex = createOpenFLTemplateCubeTexture(size);
 
 		var data = FoxRenderer.getTextureFormat(format);
 		var type = Reflect.field(gl, type.toUpperCase());
@@ -963,6 +1045,50 @@ class FoxRenderer {
 		return tex;
 	}
 
+	public static function createOpenFLTemplateTexture(width:Int, height:Int, withGL:Bool=false) {
+		var gl = context.gl;
+
+		// Create dummy texture object
+		FoxRenderer.allocationsThisFrame += 2;
+		@:privateAccess var tex = new Texture(context, 2, 2, cast 1, false, 0);
+
+		// Cleanup
+		tex.dispose();
+
+		// Now setup our texture
+		tex.__width = width;
+		tex.__height = height;
+
+		if(withGL) {
+			tex.__textureID = gl.createTexture();
+			context.__bindGLTexture2D(tex.__textureID);
+		}
+
+		return tex;
+	}
+
+	public static function createOpenFLTemplateCubeTexture(size:Int, withGL:Bool=false) {
+		var gl = context.gl;
+
+		// Create dummy texture object
+		FoxRenderer.allocationsThisFrame += 2;
+		@:privateAccess var tex = new CubeTexture(context, 2, cast 1, false, 0);
+
+		// Cleanup
+		tex.dispose();
+
+		// Now setup our texture
+		tex.__width = size;
+		tex.__height = size;
+
+		if(withGL) {
+			tex.__textureID = gl.createTexture();
+			context.__bindGLTextureCubeMap(tex.__textureID);
+		}
+
+		return tex;
+	}
+
 	public static function getGLCubemapSide(side:FoxCubemapSide):Int {
 		var gl = context.gl;
 		return switch(side) {
@@ -980,7 +1106,7 @@ class FoxRenderer {
 		var gl = context.gl;
 		var status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
 		if(status != gl.FRAMEBUFFER_COMPLETE) {
-			trace('[FoxLite > FoxRenderer] Warning: FRAMEBUFFER NOT COMPLETE. Status: $status');
+			FoxLog.warning('FoxRenderer', 'FRAMEBUFFER NOT COMPLETE. Status: $status');
 			return false;
 		}
 		return true;
@@ -1062,7 +1188,7 @@ class FoxRenderer {
 
 	public static function setAttributePointerAt(index:Int, buffer:FoxVertexBuffer, bufferOffset:Int=0) {
 		if(index < 0) return;
-		if(buffer == null) {
+		if(buffer?.id == null) {
 			GL.disableVertexAttribArray(index);
 			context.__bindGLArrayBuffer(null);
 			return;
