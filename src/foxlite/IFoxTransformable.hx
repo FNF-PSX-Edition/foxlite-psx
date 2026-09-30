@@ -25,6 +25,8 @@ interface IFoxTransformable {
 	public var angleY(get, set):Float;
 	public var angleZ(get, set):Float;
 
+	public var rotationOrder:EulerOrder = EulerOrder.ZXY;
+
 	// Internal transforms
 	public var transform:Matrix3D;
 	// TODO? add a setter and update position/rotation/scale in global space
