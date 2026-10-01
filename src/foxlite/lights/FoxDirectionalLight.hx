@@ -41,6 +41,7 @@ class FoxDirectionalLight extends FoxBaseLight {
 			FoxMathUtil.viewMatrixFromTransform(viewMatrix, transform);
 			viewMatrix.appendTranslation(0, 0, -256);
 			var p = camera.globalPosition;
+			// Move in steps to reduce aliasing warping
 			viewMatrix.prependTranslation(-Math.ffloor(p.x), Math.ffloor(p.y), -Math.ffloor(p.z));
 
 			// Projection * View
