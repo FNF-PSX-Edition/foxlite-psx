@@ -29,6 +29,7 @@ class TypedArray {
 	public static inline final Float64 = 9;
 
 	#if foxlite_polymod
+	// Create with array
 	public inline static function Int8Array(data:Array<Int>):ArrayBufferView {
 		return new ArrayBufferView(0, Int8).initArray(data);
 	}
@@ -65,8 +66,44 @@ class TypedArray {
 		return new ArrayBufferView(0, Float64).initArray(data);
 	}
 
-	#else 
+	// Create with length
+	public inline static function Int8ArrayN(elements:Int):ArrayBufferView {
+		return new ArrayBufferView(elements, Int8);
+	}
 
+	public inline static function Int16ArrayN(elements:Int):ArrayBufferView {
+		return new ArrayBufferView(elements, Int16);
+	}
+
+	public inline static function Int32ArrayN(elements:Int):ArrayBufferView {
+		return new ArrayBufferView(elements, Int32);
+	}
+
+	public inline static function UInt8ArrayN(elements:Int):ArrayBufferView {
+		return new ArrayBufferView(elements, Uint8);
+	}
+
+	public inline static function UInt8ClampedArrayN(elements:Int):ArrayBufferView {
+		return new ArrayBufferView(elements, Uint8Clamped);
+	}
+
+	public inline static function UInt16ArrayN(elements:Int):ArrayBufferView {
+		return new ArrayBufferView(elements, Uint16);
+	}
+
+	public inline static function UInt32ArrayN(elements:Int):ArrayBufferView {
+		return new ArrayBufferView(elements, Uint32);
+	}
+	
+	public inline static function Float32ArrayN(elements:Int):ArrayBufferView {
+		return new ArrayBufferView(elements, Float32);
+	}
+
+	public inline static function Float64ArrayN(elements:Int):ArrayBufferView {
+		return new ArrayBufferView(elements, Float64);
+	}
+	#else 
+	// Create with array
 	public inline static function Int8Array(data:Array<Int>):Int8Array {
 		return new Int8Array(null, data);
 	}
@@ -101,6 +138,43 @@ class TypedArray {
 	
 	public inline static function Float64Array(data:Array<Float>):Float64Array {
 		return new Float64Array(null, data);
+	}
+	
+	// Create with length
+	public inline static function Int8ArrayN(elements:Int):Int8Array {
+		return new Int8Array(elements);
+	}
+
+	public inline static function Int16ArrayN(elements:Int):Int16Array {
+		return new Int16Array(elements);
+	}
+
+	public inline static function Int32ArrayN(elements:Int):Int32Array {
+		return new Int32Array(elements);
+	}
+
+	public inline static function UInt8ArrayN(elements:Int):UInt8Array {
+		return new UInt8Array(elements);
+	}
+
+	public inline static function UInt8ClampedArrayN(elements:Int):UInt8ClampedArray {
+		return new UInt8ClampedArray(elements);
+	}
+
+	public inline static function UInt16ArrayN(elements:Int):UInt16Array {
+		return new UInt16Array(elements);
+	}
+
+	public inline static function UInt32ArrayN(elements:Int):UInt32Array {
+		return new UInt32Array(elements);
+	}
+
+	public inline static function Float32ArrayN(elements:Int):Float32Array {
+		return new Float32Array(elements);
+	}
+	
+	public inline static function Float64ArrayN(elements:Int):Float64Array {
+		return new Float64Array(elements);
 	}
 	#end
 }
