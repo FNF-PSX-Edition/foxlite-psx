@@ -8,6 +8,7 @@ import foxlite.culling.BoundingBox;
 import foxlite.culling.FrustumPlanes;
 import foxlite.lights.FoxLightData;
 import foxlite.math.FoxMathUtil;
+import foxlite.math.EulerOrder;
 import foxlite.renderer.FoxRenderPass;
 import foxlite.renderer.FoxRenderer;
 import foxlite.system.FoxDrawTree;
@@ -100,6 +101,7 @@ class FoxCamera extends FoxObject {
 
 	public function new(x:Float=0, y:Float=0, z:Float=0, _bgColor:FlxColor=0x0, ortho:Bool=false, withLightData:Bool=true) {
 		super(x, y, z);
+		rotationOrder = EulerOrder.ZXY;
 		bgColor = _bgColor;
 		orthogonal = ortho;
 		name = "FoxCamera";

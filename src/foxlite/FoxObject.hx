@@ -2,6 +2,7 @@ package foxlite;
 
 import foxlite.FoxBasic;
 import foxlite.math.FoxMathUtil;
+import foxlite.math.EulerOrder;
 import foxlite.renderer.FoxRenderer;
 import openfl.geom.Matrix3D;
 import openfl.geom.Vector3D;
@@ -31,6 +32,26 @@ class FoxObject extends FoxBasic {
 	public var angleX(get, set):Float;
 	public var angleY(get, set):Float;
 	public var angleZ(get, set):Float;
+
+	/**
+		This controls the way this object is rotated (via `rotation`)
+
+		The rotation is applied per-axis sequentially, meaning the way one axis rotate can
+		influence the next rotation.
+
+		By default, the Z axis rotates first, this makes the object roll.
+
+		Then the Y axis is rotated next, this orients the rolled object horizontally,
+		think of it as a swiveling floor fan.
+
+		And last, the X axis is rotated, this has the effect of tilting the Y rotation.
+
+		This is done in this order so there is no gimbal-lock when converting euler angles from quaternions.
+		However, this order affects camera rotations. 
+
+		Custom camera controllers should use ZXY order instead so no tilting occurs.
+	**/
+	public var rotationOrder:EulerOrder = EulerOrder.ZYX;
 
 	/**
 		This is the global transform for this Object, it encodes position, rotation and scale in a 4x4 matrix
@@ -120,7 +141,7 @@ class FoxObject extends FoxBasic {
 	public override function update(dt) {
 		super.update(dt);
 		// Calculations must happen for parent every time
-		FoxMathUtil.transformMatrix(transform, position, rotation, scale);
+		FoxMathUtil.transformMatrix(transform, position, rotation, scale, rotationOrder);
 		if(parent != null) {
 			if(!parent.__destroyed) transform.append(parent.transform);
 			else parent = null;

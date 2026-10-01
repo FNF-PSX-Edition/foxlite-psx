@@ -4,6 +4,7 @@ import foxlite.color.FoxColorUtil;
 import flixel.util.FlxColor;
 import foxlite.FoxObject;
 import foxlite.math.FoxMathUtil;
+import foxlite.math.EulerOrder;
 import foxlite.renderer.FoxRenderer;
 import openfl.geom.Matrix3D;
 import openfl.geom.Vector3D;
@@ -107,6 +108,7 @@ class FoxBaseLight extends FoxObject {
 
 	public function new(x:Float=0, y:Float=0, z:Float=0, color:FlxColor=0xFFFFFFFF, energy:Float=1, shadow:Bool=false) {
 		super(x, y, z);
+		rotationOrder = EulerOrder.ZXY;
 		this.energy = energy;
 		this.shadow = shadow;
 		FoxColorUtil.fromFlxColor(color, this.color);
