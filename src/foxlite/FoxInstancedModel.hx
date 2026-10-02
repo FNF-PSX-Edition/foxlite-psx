@@ -101,30 +101,9 @@ class FoxInstancedModel extends FoxModel {
 			};
 			case FoxInstanceUpdateMode.CHUNK: 
 				if(__instanceBufferDirty && __instanceMinChunk != 0xFEDE10B0) {
-					var elements = (__instanceMaxChunk - __instanceMinChunk) * 4;
-					var byteLength = elements*4;
-
-					var bytes:Bytes = Bytes.alloc(byteLength);
-					var buffer = Float32Array.fromBytes(bytes);
-
-					var column0 = instanceData.column0;
-					var column1 = instanceData.column1;
-					var column2 = instanceData.column2;
-					var color = instanceData.color;
-
-					var offset = __instanceMinChunk*16;
-					var i = __instanceMinChunk*16; // 4 components x 4 bytes
-
-					bytes.blit(0, column0.bytes, i, byteLength);
-					column0.glBuffer.updateFromTypedArray(buffer, offset);
-					bytes.blit(0, column1.bytes, i, byteLength);
-					column1.glBuffer.updateFromTypedArray(buffer, offset);
-					bytes.blit(0, column2.bytes, i, byteLength);
-					column2.glBuffer.updateFromTypedArray(buffer, offset);
-					bytes.blit(0, color.bytes, i, byteLength);
-					color.glBuffer.updateFromTypedArray(buffer, offset);
 					
-					FoxRenderer.allocationsThisFrame += 2;
+					instanceData.flushRegion(__instanceMinChunk, __instanceMaxChunk);
+					
 					__instanceBufferDirty = false;
 					// Reset bounds
 					__instanceMaxChunk = -1;

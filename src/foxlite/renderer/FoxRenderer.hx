@@ -17,6 +17,7 @@ import foxlite.math.FoxMathUtil;
 import foxlite.mesh.FoxMesh;
 import foxlite.mesh.buffer.FoxVertexBufferType;
 import foxlite.mesh.buffer.FoxVertexBuffer;
+import foxlite.mesh.buffer.FoxVertexMultiBuffer;
 import foxlite.polyfill.VectorFactory;
 import foxlite.flixel.FlxTypedSignalImpl;
 import foxlite.system.Int32BufferCache;
@@ -894,21 +895,10 @@ class FoxRenderer {
 
 		// Instance data
 		var ID = attrib.instanceData;
-		
-		if(ID.data0 != -1) {
-			FoxRenderer.setAttributePointerAt(ID.data0, instanceData.column0.glBuffer);
-			GL.vertexAttribDivisor(ID.data0, 1);
 
-			FoxRenderer.setAttributePointerAt(ID.data1, instanceData.column1.glBuffer);
-			GL.vertexAttribDivisor(ID.data1, 1);
-
-			FoxRenderer.setAttributePointerAt(ID.data2, instanceData.column2.glBuffer);
-			GL.vertexAttribDivisor(ID.data2, 1);
-		}
-		
-		if(ID.color != -1) {
-			FoxRenderer.setAttributePointerAt(ID.color, instanceData.color.glBuffer);
-			GL.vertexAttribDivisor(ID.color, 1);
+		if(ID != -1) {
+			FoxRenderer.setAttributePointerMultiAt(ID, instanceData.data, 4);
+			for(i in 0...4) GL.vertexAttribDivisor(ID+i, 1);
 		}
 
 		// Draw things the OpenGL way
@@ -918,12 +908,10 @@ class FoxRenderer {
 		
 		// Restore state, else everything will be void
 		
-		if(ID.data0 != -1) {
-			GL.vertexAttribDivisor(ID.data0, 0);
-			GL.vertexAttribDivisor(ID.data1, 0);
-			GL.vertexAttribDivisor(ID.data2, 0);
+		if(ID != -1) {
+			FoxRenderer.setAttributePointerMultiAt(ID, null, 4);
+			for(i in 0...4) GL.vertexAttribDivisor(ID+i, 0);
 		}
-		if(ID.color != -1) GL.vertexAttribDivisor(ID.color, 0);
 
 		FoxRenderer.drawCalls += 1;
 		FoxRenderer.verticesDrawn += elements*count;
@@ -1196,5 +1184,21 @@ class FoxRenderer {
 		context.__bindGLArrayBuffer(buffer.id);
 		GL.enableVertexAttribArray(index);
 		GL.vertexAttribPointer(index, buffer.components, buffer.type, buffer.normalized, buffer.stride, bufferOffset);
+	}
+
+	public static function setAttributePointerMultiAt(index:Int, buffer:FoxVertexMultiBuffer, regions:Int=1) {
+		if(index < 0) return;
+		if(buffer?.id == null) {
+			for(i in 0...regions) GL.disableVertexAttribArray(index+i);
+			context.__bindGLArrayBuffer(null);
+			return;
+		}
+		context.__bindGLArrayBuffer(buffer.id);
+		
+		for(i in 0...regions) {
+			var region = buffer.regions[i];
+			GL.enableVertexAttribArray(index+i);
+			GL.vertexAttribPointer(index+i, region.components, buffer.type, region.normalized, region.stride, region.offset);
+		}
 	}
 }

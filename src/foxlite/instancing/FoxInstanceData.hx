@@ -1,10 +1,11 @@
 package foxlite.instancing;
 
-import flixel.util.FlxColor;
-import foxlite.instancing.FoxInstanceChunkData;
-import foxlite.math.FoxMathUtil;
-import foxlite.renderer.FoxRenderer;
 import haxe.io.Bytes;
+import foxlite.polyfill.TypedArray;
+import foxlite.math.FoxMathUtil;
+import foxlite.mesh.buffer.FoxVertexMultiBuffer;
+import foxlite.renderer.FoxRenderer;
+import flixel.util.FlxColor;
 import lime.utils.Float32Array;
 import openfl.display3D.Context3D;
 import openfl.geom.Matrix3D;
@@ -12,12 +13,14 @@ import openfl.geom.Vector3D;
 
 class FoxInstanceData {
 
-	public var column0:FoxInstanceChunkData = new FoxInstanceChunkData();
-	public var column1:FoxInstanceChunkData = new FoxInstanceChunkData();
-	public var column2:FoxInstanceChunkData = new FoxInstanceChunkData();
-	public var color:FoxInstanceChunkData = new FoxInstanceChunkData();
+	public var data:FoxVertexMultiBuffer = new FoxVertexMultiBuffer(0, 0, true);
+	var _data(get, never):Float32Array;
 
-	var __tmpBuffer = new Float32Array(4);
+	inline function get__data():Float32Array {
+		return cast data.data;
+	}
+
+	var __tmpBuffer = new Float32Array(16);
 	var _bytes:Bytes;
 
 	// Temporary matrix stuffs
@@ -36,52 +39,59 @@ class FoxInstanceData {
 	}
 
 	public function reallocate(size:Int) {
-		column0.reallocate(context, size);
-		column1.reallocate(context, size);
-		column2.reallocate(context, size);
-		color.reallocate(context, size);
+		data.clearRegions();
+		data.dispose();
+		
+		var buffer = TypedArray.Float32ArrayN(size*4*16); // elements * vec4 * 16
+
+		final bytesPerElement = 4; // float
+		final byteLength = 4 * bytesPerElement; // 4 components
+		final stride = 4 * byteLength; // 4 chunks
+
+		data.addRegion(4, stride, 0); // column 0
+		data.addRegion(4, stride, byteLength); // column 1
+		data.addRegion(4, stride, byteLength*2); // column 2
+		data.addRegion(4, stride, byteLength*3); // color
 
 		// Initialize
-		
-		size *= 4;
+		size *= 16;
 		var i:Int = 0, j:Int = 1, k:Int = 2;
 		while(i < size) {
-			column0.setFloat(i, 1); // col 1, row 1
-			column1.setFloat(j, 1); // col 2, row 2
-			column2.setFloat(k, 1); // col 3, row 3
+			buffer[i+12] = 1; 
+			buffer[i+13] = 1;
+			buffer[i+14] = 1;
+			buffer[i+15] = 1; // color [R, G, B, A] Tilt your head to the left to see the matrix layout
 
-			color.setFloat(i, 1); // Color
-			color.setFloat(j, 1);
-			color.setFloat(k, 1);
-			color.setFloat(i+3, 1);
-			i += 4; j += 4; k += 4;
+			buffer[i+10] = 1; // col 2 [0, 0, 1, 0]
+			buffer[i+5]  = 1; // col 1 [0, 1, 0, 0]
+			buffer[i  ]  = 1; // col 0 [1, 0, 0, 0]
+			i += 16;
 		}
 
-		column0.glBuffer.uploadFromTypedArray(column0.buffer);
-		column1.glBuffer.uploadFromTypedArray(column1.buffer);
-		column2.glBuffer.uploadFromTypedArray(column2.buffer);
-		color.glBuffer.uploadFromTypedArray(color.buffer);
-			
-		FoxRenderer.allocationsThisFrame += 8;
+		data.uploadFromTypedArray(buffer);
+		FoxRenderer.allocationsThisFrame += 2;
 	}
 
 	public function setInstanceTransform(pos:Int, transform:Matrix3D) {
-		pos *= 4;
+		pos *= 16;
 		var a = transform.rawData.__array;
 		/*
-		* We're writing it as a 3x4 matrix:
+		* We're writing it as a transposed 3x4 matrix:
 		*  0  1  2  X
 		*  4  5  6  X
 		*  8  9 10  X
 		* 12 13 14  X
 		*/
-		var i:Int = 0, j:Int = 1, k:Int = 2;
-		for(p in pos...pos+4) {
-			column0.setFloat(p, a[i]);
-			column1.setFloat(p, a[j]);
-			column2.setFloat(p, a[k]);
-			i += 4; j += 4; k += 4;
+		var i:Int = 0;
+		for(p in pos...pos+3) {
+			_data[p  ] = a[i  ];
+			_data[p+4] = a[i+4];
+			_data[p+8] = a[i+8];
+			++i;
 		}
+		_data[pos+3] = a[12];
+		_data[pos+7] = a[13];
+		_data[pos+11] = a[14];
 	}
 
 	public function setInstanceTransformSeparate(pos:Int, ?position:Vector3D, ?rotation:Vector3D, ?scale:Vector3D) {
@@ -90,84 +100,91 @@ class FoxInstanceData {
 	}
 
 	public function getInstanceTransform(pos:Int):Matrix3D {
-		pos *= 4;
+		pos *= 16;
 		var transform = new Matrix3D();
 		var a = transform.rawData.__array;
 
-		var i:Int = 0, j:Int = 1, k:Int = 2;
-		for(p in pos...pos+4) {
-			a[i] = column0.getFloat(p);
-			a[j] = column1.getFloat(p);
-			a[k] = column2.getFloat(p);
-			i += 4; j += 4; k += 4;
+		// Note: We're getting the transposed version
+		var i:Int = 0;
+		for(p in pos...pos+3) {
+			a[i  ] = _data[p  ];
+			a[i+4] = _data[p+4];
+			a[i+8] = _data[p+8];
+			++i;
 		}
+		a[12] = _data[pos+3];
+		a[13] = _data[pos+7];
+		a[14] = _data[pos+11];
 		FoxRenderer.allocationsThisFrame += 1;
 		return transform;
 	}
 
 	public function setInstanceColor(pos:Int, col:Vector3D) {
-		pos *= 4;
-		color.setFloat(pos  , col.x);
-		color.setFloat(pos+1, col.y);
-		color.setFloat(pos+2, col.z);
-		color.setFloat(pos+3, col.w);
+		pos *= 16;
+		_data[pos+12] = col.x;
+		_data[pos+13] = col.y;
+		_data[pos+14] = col.z;
+		_data[pos+15] = col.w;
 	}
 
 	public function setInstanceFlxColor(pos:Int, col:FlxColor) {
-		pos *= 4;
-		color.setFloat(pos  , col.redFloat);
-		color.setFloat(pos+1, col.greenFloat);
-		color.setFloat(pos+2, col.blueFloat);
-		color.setFloat(pos+3, col.alphaFloat);
+		pos *= 16;
+		_data[pos+12] = col.redFloat;
+		_data[pos+13] = col.greenFloat;
+		_data[pos+14] = col.blueFloat;
+		_data[pos+15] = col.alphaFloat;
 	}
 
 	public function getInstanceColor(pos:Int):Vector3D {
-		pos *= 4;
+		pos *= 16;
 		FoxRenderer.allocationsThisFrame += 1;
 		return new Vector3D(
-			color.getFloat(pos  ),
-			color.getFloat(pos+1),
-			color.getFloat(pos+2),
-			color.getFloat(pos+3)
+			_data[pos+12],
+			_data[pos+13],
+			_data[pos+14],
+			_data[pos+15]
 		);
 	}
 
 	public function getInstanceFlxColor(pos:Int):FlxColor {
-		pos *= 4;
+		pos *= 16;
 		return FlxColor.fromRGBFloat(
-			color.getFloat(pos  ),
-			color.getFloat(pos+1),
-			color.getFloat(pos+2),
-			color.getFloat(pos+3)
+			_data[pos+12],
+			_data[pos+13],
+			_data[pos+14],
+			_data[pos+15]
 		);
 	}
 
 	public function flushAll() {
-		column0.glBuffer.updateFromTypedArray(column0.buffer);
-		column1.glBuffer.updateFromTypedArray(column1.buffer);
-		column2.glBuffer.updateFromTypedArray(column2.buffer);
-		color.glBuffer.updateFromTypedArray(color.buffer);
+		data.updateFromTypedArray(_data);
 	}
 
 	public function flushInstance(instance:Int) {
-		// Blit instance data bytes to temp
-		// Then upload them
-		var offset:Int = instance * 16;
-		var i:Int = instance * 16; // 4 components x 4 bytes
-		_bytes.blit(0, column0.bytes, i, 16);
-		column0.glBuffer.updateFromTypedArray(__tmpBuffer, offset);
-		_bytes.blit(0, column1.bytes, i, 16);
-		column1.glBuffer.updateFromTypedArray(__tmpBuffer, offset);
-		_bytes.blit(0, column2.bytes, i, 16);
-		column2.glBuffer.updateFromTypedArray(__tmpBuffer, offset);
-		_bytes.blit(0, color.bytes, i, 16);
-		color.glBuffer.updateFromTypedArray(__tmpBuffer, offset);
+		var byteOffset:Int = instance * 64; // 16 components x 4 bytes
+
+		// Blit instance data bytes to temp, then upload
+		_bytes.blit(0, #if js Bytes.ofData(_data.buffer) #else cast _data.buffer #end, byteOffset, 64);
+		data.updateFromTypedArray(__tmpBuffer, byteOffset);
+	}
+
+	public function flushRegion(fromInstance:Int, toInstance:Int) {
+		var length:Int = (toInstance - fromInstance) * 16;
+		var byteLength:Int = 4 * length;
+		var byteOffset:Int = fromInstance*64;
+
+		var buffer:Float32Array = __tmpBuffer; // we can reuse this
+		if(length != 16) buffer = TypedArray.Float32ArrayN(length); // allocate if big
+
+		var bytes:Bytes = #if js Bytes.ofData(buffer.buffer); #else cast buffer.buffer; #end
+		
+		bytes.blit(0, cast _data.buffer, byteOffset, byteLength);
+		data.updateFromTypedArray(buffer, byteOffset);
+
+		FoxRenderer.allocationsThisFrame += 1;
 	}
 
 	public function destroy() {
-		column0.dispose();
-		column1.dispose();
-		column2.dispose();
-		color.dispose();
+		data.dispose();
 	}
 }

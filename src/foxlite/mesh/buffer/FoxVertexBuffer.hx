@@ -127,8 +127,9 @@ class FoxVertexBuffer {
 	}
 
 	public function dispose() {
-		GL.deleteBuffer(id);
+		if(id != null) GL.deleteBuffer(id);
 		id = null;
 		hasData = false;
+		data = null;
 	}
 }
