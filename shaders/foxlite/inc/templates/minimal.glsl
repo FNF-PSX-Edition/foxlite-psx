@@ -17,7 +17,9 @@ void mainVert_minimal(void)
 
 	// Instancing
 	if(uInstanced) {
+		#ifndef DISABLE_INSTANCE_COLOR
 		foxlite_Colorv *= foxlite_InstanceColor;
+		#endif
 		worldTransform = worldTransform * foxlite_InstanceTransform;
 	}
 

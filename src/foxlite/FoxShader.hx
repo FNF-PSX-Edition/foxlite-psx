@@ -89,12 +89,7 @@ class FoxShader {
 		color: -1,
 		boneWeight: -1,
 		boneIndex: -1,
-		instanceData: {
-			data0: -1,
-			data1: -1,
-			data2: -1,
-			color: -1
-		}
+		instanceData: -1
 	};
 
 	/**
@@ -344,10 +339,7 @@ class FoxShader {
 		attribIdx.color = gl.getAttribLocation(glProgram, "foxlite_Color");
 		attribIdx.boneWeight = gl.getAttribLocation(glProgram, "foxlite_BoneWeight");
 		attribIdx.boneIndex = gl.getAttribLocation(glProgram, "foxlite_BoneIndex");
-		attribIdx.instanceData.data0 = gl.getAttribLocation(glProgram, "foxlite_InstanceData0");
-		attribIdx.instanceData.data1 = gl.getAttribLocation(glProgram, "foxlite_InstanceData1");
-		attribIdx.instanceData.data2 = gl.getAttribLocation(glProgram, "foxlite_InstanceData2");
-		attribIdx.instanceData.color = gl.getAttribLocation(glProgram, "foxlite_InstanceColor");
+		attribIdx.instanceData = gl.getAttribLocation(glProgram, "foxlite_InstanceData");
 		__uSkinnedLocation = uniformCache.get("uSkinned")?.location ?? -1;
 		__uInstancedLocation = uniformCache.get("uInstanced")?.location ?? -1;
 		// Bone data

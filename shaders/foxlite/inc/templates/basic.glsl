@@ -72,7 +72,9 @@ void mainVert_basic(void)
 	mat4 worldTransform = model;
 
 	if(uInstanced) {
+		#ifndef DISABLE_INSTANCE_COLOR
 		foxlite_Colorv *= foxlite_InstanceColor;
+		#endif
 		transformInstance(worldTransform, foxlite_InstanceTransform);
 	}
 

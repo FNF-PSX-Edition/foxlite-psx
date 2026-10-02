@@ -172,10 +172,10 @@ class FoxCamera extends FoxObject {
 
 		// Do operations in-place
 		__invProjectionMatrix.copyRawDataFrom(projectionMatrix.rawData);//.copyFrom(projectionMatrix); 
-		__invProjectionMatrix.invert();
+		FoxMathUtil.glslInverseMat4(__invProjectionMatrix);
 
 		__invViewMatrix.copyRawDataFrom(viewMatrix.rawData);
-		__invViewMatrix.invert();
+		FoxMathUtil.glslInverseMat4(__invViewMatrix);
 		__invViewMatrix.transpose();
 	}
 

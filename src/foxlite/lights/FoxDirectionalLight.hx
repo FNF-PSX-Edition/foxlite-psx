@@ -38,14 +38,11 @@ class FoxDirectionalLight extends FoxBaseLight {
 	public override function setToLightData(camera:FoxCamera) {
 		// Calculate view-projection transform, this is the POV of the light
 		if(shadow) {
-			FoxMathUtil.fastIdentity(viewMatrix);
-			FoxMathUtil.lookAt(viewMatrix, FoxMathUtil.ZERO, direction);
-			FoxMathUtil.fastAppendScale(viewMatrix, -1, 1, -1);
+			FoxMathUtil.viewMatrixFromTransform(viewMatrix, transform);
 			viewMatrix.appendTranslation(0, 0, -256);
 			var p = camera.globalPosition;
 			// Move in steps to reduce aliasing warping
 			viewMatrix.prependTranslation(-Math.ffloor(p.x), Math.ffloor(p.y), -Math.ffloor(p.z));
-			//viewMatrix.prependTranslation(-p.x, p.y, -p.z);
 
 			// Projection * View
 			viewProjection.copyRawDataFrom(viewMatrix.rawData);

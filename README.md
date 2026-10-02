@@ -101,6 +101,8 @@ On your `Project.xml`, under `<project>` add this line:
   ## Guides
 Currently, there's not a lot of guides because I'm the only one developing this focusing more on the code, but people have made some to help you get started.
 
+- Check this small guide adapted by [@clairedeluneee](https://github.com/clairedeluneee)! https://github.com/clairedeluneee/codename-website/blob/upstream-reformat/wiki/modding/advanced/3d/index.md
+
 - You can check the [Codename Engine discord server](https://discord.com/invite/D7ZqGtbqtE), we're mostly active there 
 
 Also check out the [API Docs!](https://dwdvil.github.io/foxlite-api-docs/)
