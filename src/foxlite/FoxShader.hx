@@ -58,6 +58,7 @@ class FoxShader {
 	public inline static final PRAGMA_SHADOW_PROGRAM = "#pragma shadow_program_check";
 	public inline static final PRAGMA_OPENGL3 = "#pragma opengl3";
 	public inline static final PRAGMA_OPENGL4 = "#pragma opengl4";
+	public inline static final PRAGMA_OPENGL_AUTO = "#pragma opengl";
 
 	// Based on OpenGL 3.2
 	// https://github.com/mattdesl/lwjgl-basics/wiki/GLSL-Versions
@@ -174,6 +175,10 @@ class FoxShader {
 			vert = StringTools.replace(vert, PRAGMA_OPENGL4, OPENGL4_VERSION);
 			frag = StringTools.replace(frag, PRAGMA_OPENGL4, OPENGL4_VERSION);
 		}
+
+		var openglContextVersion = '#version ${FoxRenderer.getGLSLVersion()}';
+		vert = StringTools.replace(vert, PRAGMA_OPENGL_AUTO, openglContextVersion);
+		frag = StringTools.replace(frag, PRAGMA_OPENGL_AUTO, openglContextVersion);
 		
 		// ---- Process foxlite flags ----
 

@@ -1,4 +1,4 @@
-
+#pragma opengl
 #define MINIMAL_FRAG
 #include "foxlite/inc/templates/minimal.glsl"
 

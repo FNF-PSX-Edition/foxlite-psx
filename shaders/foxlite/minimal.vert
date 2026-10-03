@@ -1,4 +1,4 @@
-
+#pragma opengl
 #define MINIMAL_VERT
 #include "foxlite/inc/templates/minimal.glsl"
 

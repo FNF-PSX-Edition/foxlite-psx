@@ -370,12 +370,23 @@ class FoxRenderer {
 		#if foxlite_polymod
 		return FlxG.stage.window;
 		#else
-		return openfl.Lib.application.window;
+		return lime.app.Application.current.window;
 		#end
 	}
 
 	public inline static function getGLVersion() {
 		return getWindow().context.version;
+	}
+
+	public inline static function getGLSLVersion():String {
+		final e = new EReg('\\d\\.\\d', 'i');
+		if(e.match(GL.getParameter(context.gl.SHADING_LANGUAGE_VERSION))) {
+			var version:Int = Std.int(Math.max(Math.round(Std.parseFloat(e.matched(0))*100), 100));
+			var es = FoxRenderer.renderContext == "WEBGL" || StringTools.endsWith(FoxRenderer.renderContext, 'ES') ? 'es' : '';
+			if(version == 100) return '100'; // fallback
+			return '$version $es';
+		}
+		return '100';
 	}
 
 	/**
@@ -398,6 +409,7 @@ class FoxRenderer {
 		Initializes static classes
 	**/
 	public static function initLibs() {
+		if(FoxRenderer.initialized) return;
 		trace('---------------     Initializing Libs     ---------------');
 		FoxMathUtil.staticInit();
 		FoxCache.staticInit();
