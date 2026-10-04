@@ -348,6 +348,11 @@ class FoxRenderer {
 		
 		if(!FlxG.signals.preStateSwitch.has(FoxCache.cleanup)) 
 			FlxG.signals.preStateSwitch.add(FoxCache.cleanup);
+
+		#if mac
+		if(!FlxG.signals.postStateSwitch.has(__clearVAO))
+			FlxG.signals.postStateSwitch.add(__clearVAO);
+		#end
 	}
 
 	/**
@@ -474,6 +479,10 @@ class FoxRenderer {
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, FoxRenderer.__indexBuffer);
 
 		FoxRenderer.mustRebuildDrawGroups = false;
+	}
+
+	public static function __clearVAO() {
+		if(__shader != null) for(i in 0...GL.getParameter(context.gl.MAX_VERTEX_ATTRIBS)) GL.disableVertexAttribArray(i);
 	}
 
 	/**
