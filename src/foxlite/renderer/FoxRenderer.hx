@@ -56,6 +56,7 @@ typedef FoxGLExtensions = {
 	?elementIndexUint:Dynamic, // WebGL 1
 	?instancedArrays:Dynamic, // WebGL 1 / ES 2
 	?textureCompression:Dynamic,
+	?blend_minmax:Dynamic,
 	// Compressed textures
 	?astc:Dynamic,
 	// S3TC
@@ -208,7 +209,7 @@ class FoxRenderer {
 		
 		FoxRenderer.renderContext = '${window.context.type}'.toUpperCase();
 		FoxRenderer.glDeviceName = gl.getParameter(gl.RENDERER);
-		FoxLog.log('FoxRenderer', 'lime is ${renderContext} (${Std.string(GL.context)}):\n    - Shader model: ${GL.getParameter(context.gl.SHADING_LANGUAGE_VERSION)}\n    - Device: $glDeviceName');
+		FoxLog.log('FoxRenderer', 'lime is ${renderContext} (${Std.string(GL.context)}):\n    - OpenGL Version: ${GL.getParameter(context.gl.SHADING_LANGUAGE_VERSION)}\n    - GLSL: #version ${getGLSLVersion()}\n    - Device: $glDeviceName');
 	
 		// Activate extensions
 		extensions.drawBuffersEXT = GL.getExtension("ARB_draw_buffers")
@@ -240,6 +241,8 @@ class FoxRenderer {
 								  ?? GL.getExtension("ANGLE_instanced_arrays");
 
 		extensions.textureCompression = GL.getExtension("ARB_texture_compression");
+
+		extensions.blend_minmax = GL.getExtension("EXT_blend_minmax");
 
 		// These though, we do need em
 		extensions.astc = GL.getExtension("KHR_texture_compression_astc_ldr")
@@ -392,22 +395,6 @@ class FoxRenderer {
 			return '$version $es';
 		}
 		return '100';
-	}
-
-	/**
-		Returns a Map containing the supported extensions for the OpenGL context.
-
-		It is different than `gl.getSupportedExtensions()` since most of the time, the extension object does not exist even if it's listed as supported.
-		This function returns the extensions that do exist in lime.
-	**/
-	public static function getSupportedExtensionsObject():Map<String, Dynamic> {
-		var extMap:Map<String, Dynamic> = new StringMap();
-		
-		for(e in GL.getSupportedExtensions()) {
-			var ext = GL.getExtension(e);
-			if(ext != null) extMap.set(e, ext);
-		}
-		return extMap;
 	}
 
 	/**
@@ -946,33 +933,45 @@ class FoxRenderer {
 			if(blendMode == 0) gl.disable(gl.BLEND);
 			else {
 				gl.enable(gl.BLEND);
+
+				switch(blendMode) {
+					case FoxBlendMode.SUBTRACT: 
+						gl.blendEquation(gl.FUNC_REVERSE_SUBTRACT);
+					case FoxBlendMode.DARKEN:
+						gl.blendEquation(0x8007); // GL_MIN
+					case FoxBlendMode.LIGHTEN:
+						gl.blendEquation(0x8008); // GL_MAX
+					default:
+						gl.blendEquation(gl.FUNC_ADD);
+				}
 				
 				// Functions
 				switch(blendMode) {
-					case FoxBlendMode.MIX: {
-						gl.blendEquation(gl.FUNC_ADD);
+					case FoxBlendMode.MIX: 
 						gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-					};
-					case FoxBlendMode.ADD: {
-						gl.blendEquation(gl.FUNC_ADD);
+					case FoxBlendMode.ADD: 
 						gl.blendFunc(gl.ONE, gl.ONE);
-					};
-					case FoxBlendMode.SUBTRACT: {
-						gl.blendEquation(gl.FUNC_REVERSE_SUBTRACT);
+					case FoxBlendMode.SUBTRACT: 
 						gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-					};
-					case FoxBlendMode.MULTIPLY: {
-						gl.blendEquation(gl.FUNC_ADD);
+					case FoxBlendMode.MULTIPLY: 
 						gl.blendFunc(gl.DST_COLOR, gl.ZERO);
-					};
-					case FoxBlendMode.PREMULTIPLIED_ALPHA: {
-						gl.blendEquation(gl.FUNC_ADD);
+					case FoxBlendMode.PREMULTIPLIED_ALPHA: 
 						gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-					};
-					default: {
-						gl.blendEquation(gl.FUNC_ADD);
+					case FoxBlendMode.SCREEN: 
+						gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_COLOR);
+					case FoxBlendMode.ERASE: 
+						gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
+					case FoxBlendMode.EXCLUSION: 
+						gl.blendFunc(gl.ONE_MINUS_DST_COLOR, gl.ONE_MINUS_SRC_COLOR);
+					case FoxBlendMode.XOR:
+						gl.blendFunc(gl.ONE_MINUS_DST_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+					case FoxBlendMode.MASK:
+						gl.blendFunc(gl.ZERO, gl.SRC_ALPHA);
+					case FoxBlendMode.LIGHTEN, 
+						 FoxBlendMode.DARKEN:
+						gl.blendFunc(gl.ONE, gl.ONE);
+					default: 
 						gl.blendFunc(gl.ONE, gl.ZERO);
-					};
 				}
 			}
 

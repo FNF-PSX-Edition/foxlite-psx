@@ -187,6 +187,8 @@ class FoxShader {
 
 		if(flags == null) flags = [];
 		else flags = flags.copy();
+
+		if(FoxRenderer.renderContext == "WEBGL") flags.push('WEB_GL=${FoxRenderer.getGLVersion()}');
 		
 		flags = FoxShader.sanitizeFlags(flags);
 
