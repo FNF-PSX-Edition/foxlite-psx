@@ -56,8 +56,6 @@ class FoxMesh {
 	public var context:Context3D = null;
 	public var __isCopy:Bool = false;
 
-	public var raycastVerts:Array<Float> = null;
-	public var raycastIndices:Array<Int> = null;
 	/**
 		Mesh is considered loaded when the vertex array is atleast loaded
 	**/
@@ -180,8 +178,6 @@ class FoxMesh {
 	**/
 	public function setArrays(?vertices:Array<Float>, ?uvtData:Array<Float>, ?indices:Array<Int>, ?material_:FoxMaterial, ?normals:Array<Float>, ?colors:Array<Float>, ?weights:Array<Float>, ?influences:Array<Int>, bigIndices:Bool=false, bigInfluence:Bool=false) {
 		if(material_ != null) material = material_;
-		if (vertices != null) raycastVerts = vertices;
-		if (indices != null) raycastIndices = indices;
 
 		if(vertices?.length > 0) {
 			disposeBuffer(FoxVertexBufferType.VERTICES);
