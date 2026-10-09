@@ -361,7 +361,7 @@ class FoxRenderer {
 		#define varying in
 		out vec4 fragColor;
 		#else
-		#define fragColor gl_FragColor;
+		#define fragColor gl_FragColor
 		#endif
 		uniform sampler2D bitmap;
 
