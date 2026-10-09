@@ -680,15 +680,13 @@ class FoxShader {
 	public function disposeProgram() {
 		if(program != null) {
 			if(!__isCombined) {
-				GL.deleteProgram(program.glProgram);
-				GL.deleteShader(program.glFragmentShader);
-				GL.deleteShader(program.glVertexShader);
+				if(program.glProgram != null) GL.deleteProgram(program.glProgram);
+				if(program.glFragmentShader != null) GL.deleteShader(program.glFragmentShader);
+				if(program.glVertexShader != null) GL.deleteShader(program.glVertexShader);
 			}
-			else {
-				program.glProgram = null;
-				program.glFragmentShader = null;
-				program.glVertexShader = null;
-			}
+			program.glProgram = null;
+			program.glFragmentShader = null;
+			program.glVertexShader = null;
 		}
 		program = null;
 		shadow?.disposeProgram();

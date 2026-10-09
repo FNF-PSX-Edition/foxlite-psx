@@ -1195,16 +1195,6 @@ class FoxRenderer {
 			glVertexShader: null
 		};
 		
-		// TODO: Use this until we figure out why is the previous stuff crashing in old drivers
-		var program = context.createProgram(cast 1);
-		@:privateAccess {
-			program.__uploadFromGLSL(vertexSource, fragmentSource);
-			programData.glProgram = program.__glProgram;
-			programData.glVertexShader = program.__glVertexShader;
-			programData.glFragmentShader = program.__glFragmentShader;
-		}
-		
-		/*
 		var vertShader = programData.glVertexShader = GL.createShader(context.gl.VERTEX_SHADER);
 		if(!compileGLShaderDebug(vertShader, vertexSource, shaderAssetsKey)) return null;
 
@@ -1223,7 +1213,6 @@ class FoxRenderer {
 			GL.deleteProgram(program);
 			return null;
 		}
-		*/
 
 		return programData;
 	}
