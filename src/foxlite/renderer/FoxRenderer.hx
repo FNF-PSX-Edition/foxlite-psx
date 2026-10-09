@@ -1195,17 +1195,17 @@ class FoxRenderer {
 			glVertexShader: null
 		};
 
-		var vertShader = programData.glVertexShader = GL.createShader(context.gl.VERTEX_SHADER);
-		if(!compileGLShaderDebug(vertShader, vertexSource, shaderAssetsKey)) return null;
+		programData.glVertexShader = compileGLShaderDebug(context.gl.VERTEX_SHADER, vertexSource, shaderAssetsKey);
+		if(programData.glVertexShader == null) return null;
 
-		var fragShader = programData.glFragmentShader = GL.createShader(context.gl.FRAGMENT_SHADER);
-		if(!compileGLShaderDebug(fragShader, fragmentSource, shaderAssetsKey)) return null;
+		programData.glFragmentShader = compileGLShaderDebug(context.gl.FRAGMENT_SHADER, fragmentSource, shaderAssetsKey);
+		if(programData.glFragmentShader == null) return null;
 
 		var program = programData.glProgram = GL.createProgram();
 		GL.bindAttribLocation(program, 0, "foxlite_Position");
 
-		GL.attachShader(program, vertShader);
-		GL.attachShader(program, fragShader);
+		GL.attachShader(program, programData.glVertexShader);
+		GL.attachShader(program, programData.glFragmentShader);
 		GL.linkProgram(program);
 
 		if(GL.getProgramParameter(program, context.gl.LINK_STATUS) == 0) {
@@ -1217,13 +1217,14 @@ class FoxRenderer {
 		return programData;
 	}
 
-	public static function compileGLShaderDebug(shader:lime.graphics.opengl.GLShader, source:String, ?shaderAssetsKey:String):Bool {
+	public static function compileGLShaderDebug(glShaderType:Int, source:String, ?shaderAssetsKey:String):lime.graphics.opengl.GLShader {
+		var shader = GL.createShader(glShaderType);
 		GL.shaderSource(shader, source);
 		GL.compileShader(shader);
+
 		if(GL.getShaderParameter(shader, context.gl.COMPILE_STATUS) == 0) {
 			var log = GL.getShaderInfoLog(shader);
 			var type = GL.getShaderParameter(shader, context.gl.SHADER_TYPE);
-			GL.deleteShader(shader);
 
 			var shaderTypeStr = switch(type) {
 				case 0x8B30: "FRAGMENT";
@@ -1271,55 +1272,10 @@ class FoxRenderer {
 			}
 			var msg = 'Error compiling $shaderTypeStr shader: \n$log';
 			FoxLog.log('FoxRenderer', msg);
-			return false;
+			return null;
 		}
-		return true;
+		return shader;
 	}
-
-	/**
-	* Uploads vertex and fragment sources for the GLSL program.
-	* This is a cut-down copy of `Program3D.uploadSources()` to remove that annoying prefix and reduce memory usage/processing
-	*/
-	/*
-	public static function uploadFromGLSLProgram3D(program:Program3D, vertexSource:String, fragmentSource:String) {
-		var gl = context.gl;
-		program.__deleteShaders();
-		try {
-			program.__uploadFromGLSL(vertexSource, fragmentSource);
-		}
-		catch(e:String) {
-			// Better shader error handler
-			// Performance isn't the best, but that's not the priority here
-			var err = new EReg("ERROR:\\s+(.+?):\\s+('.+)\\n", 'i');
-			if(!err.match(e)) {
-				// Match failed case?
-				getWindow().alert(e);
-			}
-			else {
-				var line = Std.parseInt(err.matched(1).split(':')[1]);
-				var errMsg = 'Near line $line: ${err.matched(2)}';
-				line -= 2;
-				if(line < 0) line = 0;
-				
-				final errVert = StringTools.urlDecode("%5D%20ERROR%3A%20Error%20compiling%20vertex%20shader");
-				final errFrag = StringTools.urlDecode("%5D%20ERROR%3A%20Error%20compiling%20fragment%20shader");
-
-				var isVertex = StringTools.contains(e, errVert);
-				var isFragment = StringTools.contains(e, errFrag);
-
-				var source = isVertex ? vertexSource : fragmentSource;
-				var lines = source.split('\n');
-				var msg = 'Error compiling ${isVertex ? 'vertex':'fragment'} shader!\n$errMsg\n';
-
-				for(i in line-5...line+5) {
-					var lineMsg = '${i+2} ${lines[i]}';
-					if(i == line) lineMsg = '>$lineMsg';
-					msg += '\n$lineMsg';
-				}
-				getWindow().alert(msg);
-			}
-		}
-	} */
 
 	public static function setAttributePointerAt(index:Int, buffer:FoxVertexBuffer, bufferOffset:Int=0) {
 		if(index < 0) return;
