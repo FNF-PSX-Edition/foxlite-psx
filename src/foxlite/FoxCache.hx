@@ -11,7 +11,7 @@ import foxlite.skin.FoxSkinData;
 #if !foxlite_polymod
 @dox(hide) typedef FoxTextureCollection = Map<String, FoxTexture>;
 @dox(hide) typedef FoxShaderCollection = Map<String, FoxShader>;
-@dox(hide) typedef FoxShaderDefinesCollection = Map<String, String>;
+@dox(hide) typedef FoxShaderIncludesCollection = Map<String, String>;
 @dox(hide) typedef FoxMaterialCollection = Map<String, Map<String, FoxMaterial>>;
 @dox(hide) typedef FoxMeshCollection = Map<String, Array<FoxMesh>>;
 @dox(hide) typedef FoxAnimationCollection = Map<String, Map<String, FoxAnimation>>;
@@ -22,7 +22,7 @@ class FoxCache {
 
 	public var _texture:FoxTextureCollection = new StringMap();
 	public var _shaders:FoxShaderCollection = new StringMap();
-	public var _shaderIncludes:FoxShaderDefinesCollection = new StringMap();
+	public var _shaderIncludes:FoxShaderIncludesCollection = new StringMap();
 	public var _materialLibs:FoxMaterialCollection = new StringMap();
 	public var _meshes:FoxMeshCollection = new StringMap();
 	public var _animationLibs:FoxAnimationCollection = new StringMap();
@@ -51,7 +51,7 @@ class FoxCache {
 		return FoxCache.instance._shaders;
 	}
 
-	public static inline function shaderIncludes():FoxShaderDefinesCollection {
+	public static inline function shaderIncludes():FoxShaderIncludesCollection {
 		return FoxCache.instance._shaderIncludes;
 	}
 	

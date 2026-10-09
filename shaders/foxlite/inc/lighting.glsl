@@ -175,7 +175,7 @@ vec3 light(vec3 unlit, vec3 normal, vec3 viewPosition, vec3 lightSpecular, float
 		if(i >= lightCount[LIGHT_DIRECTIONAL]) break;
 		DirLight L = directionalLights[i];
 		vec2 levels = directionalLight(L.direction.xyz, viewPosition, normal, shininess);
-		#ifdef SHADOW_GLSL
+		#if defined(SHADOW_GLSL) && defined(FRAGMENT)
 		float shadow = 1.0;
 		if(L.shadowData[ESHADOW_CASTER] >= 0.0 && levels.s != 0.0) shadow = shadowDirectional(directionalShadowLightSpace[i], L.shadowRegion, L.shadowData[ESHADOW_BLUR]);
 		#else
@@ -189,7 +189,7 @@ vec3 light(vec3 unlit, vec3 normal, vec3 viewPosition, vec3 lightSpecular, float
 	for(int i = 0; i < MAX_POINT_LIGHTS; ++i) {
 		if(i >= lightCount[LIGHT_POINT]) break;
 		PointLight L = pointLights[i];
-		#ifdef SHADOW_GLSL
+		#if defined(SHADOW_GLSL) && defined(FRAGMENT)
 		float shadow = 1.0;
 		if(L.shadowData[ESHADOW_CASTER] >= 0.0) shadow = shadowPointCubemap(pointShadowLightSpace[0]);
 		#else
@@ -204,7 +204,7 @@ vec3 light(vec3 unlit, vec3 normal, vec3 viewPosition, vec3 lightSpecular, float
 		if(i >= lightCount[LIGHT_SPOT]) break;
 		SpotLight L = spotLights[i];
 		vec2 levels = spotLight(L.position.xyz, L.direction.xyz, L.color.w, L.direction.w, L.position.w, viewPosition, normal, shininess);
-		#ifdef SHADOW_GLSL
+		#if defined(SHADOW_GLSL) && defined(FRAGMENT)
 		float shadow = 1.0;
 		if(L.shadowData[ESHADOW_CASTER] >= 0.0 && levels.s != 0.0) shadow = shadowSpot(spotShadowLightSpace[i], L.shadowRegion, L.shadowData[ESHADOW_BIAS], L.shadowData[ESHADOW_BLUR]);
 		#else
@@ -218,7 +218,7 @@ vec3 light(vec3 unlit, vec3 normal, vec3 viewPosition, vec3 lightSpecular, float
 	for(int i = 0; i < MAX_AREA_LIGHTS; ++i) {
 		if(i >= lightCount[LIGHT_AREA]) break;
 		AreaLight L = areaLights[i];
-		#ifdef SHADOW_GLSL
+		#if defined(SHADOW_GLSL) && defined(FRAGMENT)
 		float shadow = 1.0;
 		if(L.shadowData[ESHADOW_CASTER] >= 0.0) shadow = shadowArea(areaShadowLightSpace[0]);
 		#else

@@ -7,6 +7,7 @@ import StringTools;
 import foxlite.polyfill.TypedArray;
 import foxlite.renderer.FoxRenderer;
 import foxlite.texture.FoxTexture;
+import foxlite.material.FoxDepthCompareMode;
 import lime.graphics.opengl.GL;
 import lime.graphics.opengl.GLRenderbuffer;
 import lime.utils.Float32Array;
@@ -315,7 +316,9 @@ class FoxFramebuffer {
 	public static function createShadowMap(width:Int, height:Int):FoxFramebuffer {
 		var fb = new FoxFramebuffer();
 		var depth = FoxTexture.create(width, height, "DEPTH_COMPONENT24", "unsigned_int");
-		depth.filter = FoxTextureFilter.NEAREST;
+		depth.filter = FoxTextureFilter.LINEAR; // Enable hardware PCF
+		depth.compareMode = FoxDepthCompareMode.LESS_EQUAL;
+
 		fb.setDepthTexture(depth, false);
 
 		fb.setColorTexture(0, FoxTexture.create(width, height, "r8"));

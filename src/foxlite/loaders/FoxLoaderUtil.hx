@@ -79,4 +79,19 @@ class FoxLoaderUtil {
 			if(len == -1) break;
 		}
 	}
+
+	/**
+		Like `forEachLine()`, but the callback can return a `true` to stop execution.
+		A `false` must be returned otherwise.
+	**/
+	public static dynamic function forEachLineControl(s:String, cb:(chunk:String) -> Bool, sep:String="\n") {
+		var pos = 0;
+		var len = -1;
+		while(true) {
+			len = s.indexOf(sep, pos);
+			if(cb(s.substr(pos, len > -1 ? len-pos : null))) break;
+			pos = len+1;
+			if(len == -1) break;
+		}
+	}
 }

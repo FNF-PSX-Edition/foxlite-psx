@@ -6,13 +6,16 @@ import StringTools;
 import StringBuf;
 import haxe.ds.List;
 import haxe.ds.StringMap;
+import haxe.ds.GenericStack;
 import foxlite.FoxCache;
 import foxlite.FoxShader;
 import foxlite.culling.BoundingBox;
 import foxlite.instancing.FoxInstanceData;
 import foxlite.lights.FoxLightData;
+import foxlite.loaders.FoxLoaderUtil;
 import foxlite.material.FoxBlendMode;
 import foxlite.material.FoxMaterial;
+import foxlite.material.FoxDepthCompareMode;
 import foxlite.math.FoxMathUtil;
 import foxlite.mesh.FoxMesh;
 import foxlite.mesh.buffer.FoxVertexBufferType;
@@ -34,7 +37,6 @@ import lime.graphics.opengl.GL;
 import lime.utils.DataPointer;
 import lime.utils.Float32Array;
 import openfl.display3D.Context3D;
-import openfl.display3D.Program3D;
 import openfl.display3D.textures.CubeTexture;
 import openfl.display3D.textures.Texture;
 import openfl.geom.Rectangle;
@@ -56,6 +58,7 @@ typedef FoxGLExtensions = {
 	?elementIndexUint:Dynamic, // WebGL 1
 	?instancedArrays:Dynamic, // WebGL 1 / ES 2
 	?textureCompression:Dynamic,
+	?blend_minmax:Dynamic,
 	// Compressed textures
 	?astc:Dynamic,
 	// S3TC
@@ -65,8 +68,15 @@ typedef FoxGLExtensions = {
 	?bptc:Dynamic,
 	// Android
 	?etc1:Dynamic, // gles2
-	?etc2:Dynamic  // gles3
+	?etc2:Dynamic, // gles3
+	// Hardware shadows
+	?shadowSamplers:Dynamic, // gles2
+	// Shaders
+	?programBinary:Dynamic // Shader cache: gles2, gles3, gl3+
 };
+
+// For shader debug
+@:dox(hide) typedef IncludeStackInfo = {line:Int, fileName:String}
 
 // TODO: Make this a singleton so we don't use this many static vars
 class FoxRenderer {
@@ -208,14 +218,15 @@ class FoxRenderer {
 		
 		FoxRenderer.renderContext = '${window.context.type}'.toUpperCase();
 		FoxRenderer.glDeviceName = gl.getParameter(gl.RENDERER);
-		FoxLog.log('FoxRenderer', 'lime is ${renderContext} (${Std.string(GL.context)}):\n    - Shader model: ${GL.getParameter(context.gl.SHADING_LANGUAGE_VERSION)}\n    - Device: $glDeviceName');
+		FoxLog.log('FoxRenderer', 'lime is ${renderContext} (${Std.string(GL.context)}):\n    - OpenGL Version: ${GL.getParameter(context.gl.SHADING_LANGUAGE_VERSION)}\n    - GLSL: #version ${getGLSLVersion()}\n    - Device: $glDeviceName');
 	
 		// Activate extensions
 		extensions.drawBuffersEXT = GL.getExtension("ARB_draw_buffers")
 								 ?? GL.getExtension("EXT_draw_buffers")
 								 ?? GL.getExtension("WEBGL_draw_buffers");
 
-		extensions.depthTexture = GL.getExtension("WEBGL_depth_texture"); // Allow the use of gl.DEPTH_STENCIL_ATTACHMENT
+		extensions.depthTexture = GL.getExtension("WEBGL_depth_texture") // Allow the use of gl.DEPTH_STENCIL_ATTACHMENT
+							   ?? GL.getExtension("OES_depth_texture");
 
 		extensions.anisotropic = GL.getExtension("EXT_texture_filter_anisotropic")
   							  ?? GL.getExtension("MOZ_EXT_texture_filter_anisotropic")
@@ -240,6 +251,8 @@ class FoxRenderer {
 								  ?? GL.getExtension("ANGLE_instanced_arrays");
 
 		extensions.textureCompression = GL.getExtension("ARB_texture_compression");
+
+		extensions.blend_minmax = GL.getExtension("EXT_blend_minmax");
 
 		// These though, we do need em
 		extensions.astc = GL.getExtension("KHR_texture_compression_astc_ldr")
@@ -273,6 +286,11 @@ class FoxRenderer {
 			COMPRESSED_RGBA8_ETC2_EAC: 37496
 		};
 		#end
+
+		extensions.shadowSamplers = GL.getExtension("EXT_shadow_samplers");
+
+		extensions.programBinary = GL.getExtension("ARB_get_program_binary")
+							    ?? GL.getExtension("OES_get_program_binary");
 
 		FoxRenderer.compressedTexturesSupported = 
 		  !(extensions.s3tc == null 
@@ -313,7 +331,12 @@ class FoxRenderer {
 		MISSING_MATERIAL.textures.set("bitmap", MISSING_TEXTURE);
 		
 		// Super bare minimum shader
-		MISSING_SHADER = FoxShader.fromSources("
+		final GLSL_VERSION = getGLSLVersion();
+		MISSING_SHADER = FoxShader.fromSources('#version $GLSL_VERSION
+		#if __VERSION__ >= 150
+		#define attribute in
+		#define varying out
+		#endif
 		attribute vec4 foxlite_Position;
 		attribute vec2 foxlite_TexCoord;
 
@@ -326,7 +349,7 @@ class FoxRenderer {
 		void main(void) {
 			foxlite_TexCoordv = foxlite_TexCoord*10.;
 			gl_Position = projection * view * model * vec4(foxlite_Position.xyz, 1.0);
-		}", "
+		}', '#version $GLSL_VERSION
 		#ifdef GL_ES
 		#ifdef GL_FRAGMENT_PRECISION_HIGH
 		precision highp float;
@@ -334,15 +357,19 @@ class FoxRenderer {
 		precision mediump float;
 		#endif
 		#endif
-
+		#if __VERSION__ >= 150
+		#define varying in
+		out vec4 fragColor;
+		#else
+		#define fragColor gl_FragColor
+		#endif
 		uniform sampler2D bitmap;
 
 		varying vec2 foxlite_TexCoordv;
 
 		void main(void) {
-			gl_FragColor = texture2D(bitmap, foxlite_TexCoordv);
-		}
-		");
+			fragColor = texture2D(bitmap, foxlite_TexCoordv);
+		}');
 		MISSING_MATERIAL.shader = MISSING_SHADER;
 		FoxRenderer.initialized = true;
 		
@@ -392,22 +419,6 @@ class FoxRenderer {
 			return '$version $es';
 		}
 		return '100';
-	}
-
-	/**
-		Returns a Map containing the supported extensions for the OpenGL context.
-
-		It is different than `gl.getSupportedExtensions()` since most of the time, the extension object does not exist even if it's listed as supported.
-		This function returns the extensions that do exist in lime.
-	**/
-	public static function getSupportedExtensionsObject():Map<String, Dynamic> {
-		var extMap:Map<String, Dynamic> = new StringMap();
-		
-		for(e in GL.getSupportedExtensions()) {
-			var ext = GL.getExtension(e);
-			if(ext != null) extMap.set(e, ext);
-		}
-		return extMap;
 	}
 
 	/**
@@ -497,6 +508,20 @@ class FoxRenderer {
 		mutex.release();
 	}
 
+	public static function getDepthCompareModeGL(compareMode:FoxDepthCompareMode):Int {
+		var gl = context.gl;
+		return switch(compareMode) {
+			case FoxDepthCompareMode.NEVER: gl.NEVER;
+			case FoxDepthCompareMode.LESS: gl.LESS;
+			case FoxDepthCompareMode.EQUAL: gl.EQUAL;
+			case FoxDepthCompareMode.LESS_EQUAL: gl.LEQUAL;
+			case FoxDepthCompareMode.GREATER: gl.GREATER;
+			case FoxDepthCompareMode.NOT_EQUAL: gl.NOTEQUAL;
+			case FoxDepthCompareMode.GREATER_EQUAL: gl.GEQUAL;
+			default: gl.ALWAYS;
+		}
+	}
+
 	public static function generateMipmap(context:Context3D, texture:FoxTexture) {
 		var gl = context.gl;
 		var glTex = texture.glTexture;
@@ -552,7 +577,7 @@ class FoxRenderer {
 			if(shader.__needsCompiling) shader.compile();
 			if(shader?.shadow?.__needsCompiling == true) shader.shadow.compile();
 
-			GL.useProgram(shader.program.__glProgram);
+			GL.useProgram(shader.program?.glProgram);
 			FoxRenderer.__shader = FoxRenderer.frameCount == 0 ? null : shader; // Fix uniforms not updating before the renderer starts
 		}
 	}
@@ -673,6 +698,11 @@ class FoxRenderer {
 		gl.texParameteri(target, gl.TEXTURE_WRAP_S, wrapModeS);
 		gl.texParameteri(target, gl.TEXTURE_WRAP_T, wrapModeT);
 
+		if(texture.compareMode != null) { // Hardware comparison params
+			GL.texParameteri(gl.TEXTURE_2D, 0x884C, 0x884E); // GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE
+			GL.texParameteri(gl.TEXTURE_2D, 0x884D, getDepthCompareModeGL(texture.compareMode));  // GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL
+		}
+
 		var aniso:Float = switch(texture.filter) {
 			case FoxTextureFilter.ANISOTROPIC2X: 2;
 			case FoxTextureFilter.ANISOTROPIC4X: 4;
@@ -745,7 +775,7 @@ class FoxRenderer {
 		//context.__flushGLViewport();
 
 		//context.__flushGLBlend(); handled by setBlendMode() now
-		//context.__flushGLColor();
+		context.__flushGLColor();
 		context.__flushGLCulling(); 
 		context.__flushGLDepth();
 		//context.__flushGLScissor();
@@ -787,10 +817,9 @@ class FoxRenderer {
 		context.setDepthTest(true, cast 4); // always LESS
 		FoxRenderer.setBlendMode(context, FoxBlendMode.NONE);
 
-		if(material.colorWrite) 
-			context.setColorMask(true, true, true, true);
-		else
-			context.setColorMask(false, false, false, false);
+		// TODO: Enable this for colored shadows
+		context.setColorMask(false, false, false, false);	
+		context.__flushGLColor();
 		
 		// Stencil test
 		var stencil = material.stencil;
@@ -946,33 +975,45 @@ class FoxRenderer {
 			if(blendMode == 0) gl.disable(gl.BLEND);
 			else {
 				gl.enable(gl.BLEND);
+
+				switch(blendMode) {
+					case FoxBlendMode.SUBTRACT: 
+						gl.blendEquation(gl.FUNC_REVERSE_SUBTRACT);
+					case FoxBlendMode.DARKEN:
+						gl.blendEquation(0x8007); // GL_MIN
+					case FoxBlendMode.LIGHTEN:
+						gl.blendEquation(0x8008); // GL_MAX
+					default:
+						gl.blendEquation(gl.FUNC_ADD);
+				}
 				
 				// Functions
 				switch(blendMode) {
-					case FoxBlendMode.MIX: {
-						gl.blendEquation(gl.FUNC_ADD);
+					case FoxBlendMode.MIX: 
 						gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-					};
-					case FoxBlendMode.ADD: {
-						gl.blendEquation(gl.FUNC_ADD);
+					case FoxBlendMode.ADD: 
 						gl.blendFunc(gl.ONE, gl.ONE);
-					};
-					case FoxBlendMode.SUBTRACT: {
-						gl.blendEquation(gl.FUNC_REVERSE_SUBTRACT);
+					case FoxBlendMode.SUBTRACT: 
 						gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-					};
-					case FoxBlendMode.MULTIPLY: {
-						gl.blendEquation(gl.FUNC_ADD);
+					case FoxBlendMode.MULTIPLY: 
 						gl.blendFunc(gl.DST_COLOR, gl.ZERO);
-					};
-					case FoxBlendMode.PREMULTIPLIED_ALPHA: {
-						gl.blendEquation(gl.FUNC_ADD);
+					case FoxBlendMode.PREMULTIPLIED_ALPHA: 
 						gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-					};
-					default: {
-						gl.blendEquation(gl.FUNC_ADD);
+					case FoxBlendMode.SCREEN: 
+						gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_COLOR);
+					case FoxBlendMode.ERASE: 
+						gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
+					case FoxBlendMode.EXCLUSION: 
+						gl.blendFunc(gl.ONE_MINUS_DST_COLOR, gl.ONE_MINUS_SRC_COLOR);
+					case FoxBlendMode.XOR:
+						gl.blendFunc(gl.ONE_MINUS_DST_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+					case FoxBlendMode.MASK:
+						gl.blendFunc(gl.ZERO, gl.SRC_ALPHA);
+					case FoxBlendMode.LIGHTEN, 
+						 FoxBlendMode.DARKEN:
+						gl.blendFunc(gl.ONE, gl.ONE);
+					default: 
 						gl.blendFunc(gl.ONE, gl.ZERO);
-					};
 				}
 			}
 
@@ -1152,47 +1193,97 @@ class FoxRenderer {
 	}
 
 	/**
-	* Uploads vertex and fragment sources for the GLSL program.
-	* This is a cut-down copy of `Program3D.uploadSources()` to remove that annoying prefix and reduce memory usage/processing
-	*/
-	public static function uploadFromGLSLProgram3D(program:Program3D, vertexSource:String, fragmentSource:String) {
-		var gl = context.gl;
-		program.__deleteShaders();
-		try {
-			program.__uploadFromGLSL(vertexSource, fragmentSource);
+		Creates and compiles a GL program and shaders from sources
+
+		Optionally, an array of include file metadata can be provided for debugging files if compilation fails
+	**/
+	public static function createGLProgramFromSources(vertexSource:String, fragmentSource:String, ?shaderAssetsKey:String):FoxShaderProgramData {
+		var programData:FoxShaderProgramData = {
+			glProgram: null,
+			glFragmentShader: null,
+			glVertexShader: null
+		};
+		
+		var vertShader = programData.glVertexShader = GL.createShader(context.gl.VERTEX_SHADER);
+		if(!compileGLShaderDebug(vertShader, vertexSource, shaderAssetsKey)) return null;
+
+		var fragShader = programData.glFragmentShader = GL.createShader(context.gl.FRAGMENT_SHADER);
+		if(!compileGLShaderDebug(fragShader, fragmentSource, shaderAssetsKey)) return null;
+
+		var program = programData.glProgram = GL.createProgram();
+		GL.bindAttribLocation(program, 0, "foxlite_Position");
+
+		GL.attachShader(program, vertShader);
+		GL.attachShader(program, fragShader);
+		GL.linkProgram(program);
+
+		if(GL.getProgramParameter(program, context.gl.LINK_STATUS) == 0) {
+			FoxLog.warning("FoxRenderer", 'Could not link shader program:\n${GL.getProgramInfoLog(program)}');
+			GL.deleteProgram(program);
+			return null;
 		}
-		catch(e:String) {
-			// Better shader error handler
-			// Performance isn't the best, but that's not the priority here
-			var err = new EReg("ERROR:\\s+(.+?):\\s+('.+)\\n", 'i');
-			if(!err.match(e)) {
-				// Match failed case?
-				getWindow().alert(e);
+
+		return programData;
+	}
+
+	public static function compileGLShaderDebug(shader:lime.graphics.opengl.GLShader, source:String, ?shaderAssetsKey:String):Bool {
+		shaderAssetsKey ??= "<anonymous>";
+		GL.shaderSource(shader, source);
+		GL.compileShader(shader);
+		if(GL.getShaderParameter(shader, context.gl.COMPILE_STATUS) == 0) {
+			var log = GL.getShaderInfoLog(shader);
+			var type = GL.getShaderParameter(shader, context.gl.SHADER_TYPE);
+
+			var shaderTypeStr = switch(type) {
+				case 0x8B30: "FRAGMENT";
+				case 0x8B31: "VERTEX";
+				case 0x8DD9: "GEOMETRY";
+				case 0x8E87: "TESSELLATION EVAL";
+				case 0x8E88: "TESSELLATION CTRL";
+				case 0x91B9: "COMPUTE";
+				default: "<unknown type>";
 			}
-			else {
-				var line = Std.parseInt(err.matched(1).split(':')[1]);
-				var errMsg = 'Near line $line: ${err.matched(2)}';
-				line -= 2;
-				if(line < 0) line = 0;
-				
-				final errVert = StringTools.urlDecode("%5D%20ERROR%3A%20Error%20compiling%20vertex%20shader");
-				final errFrag = StringTools.urlDecode("%5D%20ERROR%3A%20Error%20compiling%20fragment%20shader");
 
-				var isVertex = StringTools.contains(e, errVert);
-				var isFragment = StringTools.contains(e, errFrag);
-
-				var source = isVertex ? vertexSource : fragmentSource;
-				var lines = source.split('\n');
-				var msg = 'Error compiling ${isVertex ? 'vertex':'fragment'} shader!\n$errMsg\n';
-
-				for(i in line-5...line+5) {
-					var lineMsg = '${i+2} ${lines[i]}';
-					if(i == line) lineMsg = '>$lineMsg';
-					msg += '\n$lineMsg';
-				}
-				getWindow().alert(msg);
+			var shaderTypeExtStr = switch(type) {
+				case 0x8B30: ".frag";
+				case 0x8B31: ".vert";
+				case 0x8DD9: ".geom";
+				case 0x8E87, 0x8E88: ".tess";
+				default: ".glsl";
 			}
+
+			var e = new EReg('(ERROR|WARNING):\\s+(\\d+):(\\d+):', 'i');
+			var pragmaInclude = new EReg('#pragma\\s+(endinclude|include)\\((.*)\\)', 'i');
+
+			while(e.match(log)) {
+				var ln = Std.parseInt(e.matched(3)) ?? 0; // erroring line
+				var l:Int = 0;
+				var includeStack:GenericStack<IncludeStackInfo> = new GenericStack();
+				includeStack.add({line: 0, fileName: shaderAssetsKey});
+
+				var current = includeStack.first();
+				if(ln != 0) FoxLoaderUtil.forEachLineControl(source, line -> {
+					if(pragmaInclude.match(line)) {
+						switch(pragmaInclude.matched(1)) {
+							case "include": includeStack.add({line: -1, fileName: pragmaInclude.matched(2)});
+							case "endinclude": includeStack.pop(); 
+						}
+						current = includeStack.first();
+					}
+					current.line++;
+					return (++l) == ln;
+				});
+				current = includeStack.first();
+				var fileName = current.fileName;
+				var line:String = ln == 0 ? "?" : Std.string(current.line);
+				var ext = haxe.io.Path.extension(fileName) == "" ? shaderTypeExtStr : "";
+				log = e.replace(log, '$1: $fileName$ext:$line:');
+			}
+			var msg = 'Error compiling $shaderTypeStr shader: \n$log';
+			FoxLog.log('FoxRenderer', msg);
+			return false;
 		}
+		return true;
 	}
 
 	public static function setAttributePointerAt(index:Int, buffer:FoxVertexBuffer, bufferOffset:Int=0) {
