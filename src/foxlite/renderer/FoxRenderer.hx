@@ -1253,7 +1253,6 @@ class FoxRenderer {
 				includeStack.add({line: 0, fileName: shaderAssetsKey ?? "<anonymous>"});
 
 				var current = includeStack.first();
-				var dumpS = "";
 				FoxLoaderUtil.forEachLineControl(source, line -> {
 					if(pragmaInclude.match(line)) {
 						switch(pragmaInclude.matched(1)) {
@@ -1263,10 +1262,8 @@ class FoxRenderer {
 						current = includeStack.first();
 					}
 					current.line++;
-					dumpS += '${l+1} ${current.line} ${current.fileName} ${line}\n';
 					return (++l) == ln;
 				});
-				sys.io.File.saveContent(haxe.io.Path.withoutDirectory(shaderAssetsKey)+'_dump-${e.matched(1)}.txt', dumpS);
 				var fileName = includeStack.first().fileName;
 				var line = includeStack.first().line;
 				var ext = haxe.io.Path.extension(fileName) == "" ? shaderTypeExtStr : "";
