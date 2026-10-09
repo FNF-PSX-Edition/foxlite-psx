@@ -17,7 +17,6 @@ import openfl.display3D.Program3D;
 import openfl.geom.Matrix3D;
 import openfl.geom.Vector3D;
 
-import lime.graphics.WebGLRenderContext;
 import lime.math.Vector2;
 import lime.utils.Float32Array;
 import lime.utils.Assets;
@@ -78,7 +77,7 @@ class FoxShader {
 	public static var GLOBAL_FLAGS:Array<String> = [];
 
 	var context:Context3D;
-	var gl:#if lime WebGLRenderContext #else Dynamic #end;
+	var gl:#if lime lime.graphics.WebGLRenderContext #else Dynamic #end;
 
 	/**
 		Version of the shader for the shadow pass only
@@ -166,8 +165,8 @@ class FoxShader {
 		var shader = output ?? new FoxShader();
 
 		// #include preprocessor
-		vert = FoxShader.processIncludes(vert, shader.assetsKey);
-		frag = FoxShader.processIncludes(frag, shader.assetsKey);
+		vert = FoxShader.processIncludes(vert);
+		frag = FoxShader.processIncludes(frag);
 
 		// ---- Process OPENGL pragma ----
 		
@@ -227,7 +226,7 @@ class FoxShader {
 	}
 
 	// TODO: Test further if this code doesn't give any errors/softlocks
-	public static function processIncludes(source:String, ?sourceFileName:String):String {
+	public static function processIncludes(source:String):String {
 		var includes = new EReg('((\\/\\/|\\/\\*|\\*)\\s*)*#include\\s+["\'`](.+)["\'`]', "i"); 
 		var list:Array<String> = []; // Keep track of what we've imported, also prevents recursive importing
 		while(includes.match(source)) {
