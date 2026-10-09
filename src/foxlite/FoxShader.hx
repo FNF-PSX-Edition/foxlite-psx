@@ -3,23 +3,26 @@ package foxlite;
 
 import EReg;
 import StringTools;
+import haxe.ds.IntMap;
+import haxe.ds.StringMap;
 import foxlite.FoxCache;
 import foxlite.loaders.FoxLoaderUtil;
 import foxlite.renderer.FoxRenderer;
 import foxlite.system.Float32BufferCache;
 import foxlite.system.Int32BufferCache;
 import foxlite.texture.FoxTexture;
-import haxe.ds.StringMap;
-import lime.graphics.WebGLRenderContext;
-import lime.math.Vector2;
-import lime.utils.Float32Array;
-import lime.utils.Assets;
+
 import openfl.display3D.Context3D;
 import openfl.display3D.Program3D;
 import openfl.geom.Matrix3D;
 import openfl.geom.Vector3D;
-#if foxlite_polymod
+
+import lime.graphics.WebGLRenderContext;
+import lime.math.Vector2;
+import lime.utils.Float32Array;
+import lime.utils.Assets;
 import lime.graphics.opengl.GL;
+#if foxlite_polymod
 import lime.utils.DataPointer;
 #end
 
@@ -43,10 +46,14 @@ import lime.utils.DataPointer;
 	public inline static final SAMPLER_2D = 0x8B5E;
 }
 
-#if !foxlite_polymod
 typedef FoxShaderTextureInput = {location:Int, value:FoxTexture};
 typedef FoxUniformCache = {location:Int, type:Int, size:Int};
-#end
+
+typedef FoxShaderProgramData = {
+	glProgram:lime.graphics.opengl.GLProgram,
+	glVertexShader:lime.graphics.opengl.GLShader,
+	glFragmentShader:lime.graphics.opengl.GLShader
+}
 
 class FoxShader {
 
@@ -79,7 +86,7 @@ class FoxShader {
 	public var shadow:FoxShader; 
  
 	public var assetsKey:String;
-	public var program:Program3D;
+	public var program:FoxShaderProgramData = null;
 	public var textureInput:Map<String, FoxShaderTextureInput> = new StringMap();
 	public var uniformCache:Map<String, FoxUniformCache> = new StringMap();
 	public final attribIdx = {
@@ -131,6 +138,7 @@ class FoxShader {
 
 	public var __fragSource:String;
 	public var __vertSource:String;
+
 	/**
 		The preprocessor flags for this shader.
 	**/
@@ -158,8 +166,8 @@ class FoxShader {
 		var shader = output ?? new FoxShader();
 
 		// #include preprocessor
-		vert = FoxShader.processIncludes(vert);
-		frag = FoxShader.processIncludes(frag);
+		vert = FoxShader.processIncludes(vert, shader.assetsKey);
+		frag = FoxShader.processIncludes(frag, shader.assetsKey);
 
 		// ---- Process OPENGL pragma ----
 		
@@ -219,9 +227,9 @@ class FoxShader {
 	}
 
 	// TODO: Test further if this code doesn't give any errors/softlocks
-	public static function processIncludes(source:String):String {
+	public static function processIncludes(source:String, ?sourceFileName:String):String {
 		var includes = new EReg('((\\/\\/|\\/\\*|\\*)\\s*)*#include\\s+["\'`](.+)["\'`]', "i"); 
-		var list = []; // Keep track of what we've imported, also prevents recursive importing
+		var list:Array<String> = []; // Keep track of what we've imported, also prevents recursive importing
 		while(includes.match(source)) {
 			var line = includes.matched(0);
 			var file = includes.matched(3);
@@ -243,18 +251,21 @@ class FoxShader {
 			#if foxlite_verbose
 			FoxLog.log("FoxShader", "Including shader source: " + file);
 			#end
-
+			
 			list.push(file);
-			var defPath = FoxLoaderUtil.shaderIncludeRoot(file);
-			var cache = FoxCache.shaderIncludes().get(defPath);
+			var incPath = FoxLoaderUtil.shaderIncludeRoot(file);
+			var cache = FoxCache.shaderIncludes().get(incPath);
 			if(cache == null) { // Doesn't exist in cache, try load and add
-				cache = FoxLoaderUtil.loadText(defPath);
+				cache = FoxLoaderUtil.loadText(incPath);
 				// Silly but okay
 				if(cache == null) {
-					FoxLog.warning('FoxShader', 'FILE NOT FOUND: $defPath');
-					cache = '// MISSING SOURCE: "$file" ($defPath)';
+					FoxLog.warning('FoxShader', 'FILE NOT FOUND: $incPath');
+					cache = '// MISSING SOURCE: "$file" ($incPath)';
 				}
-				else FoxCache.shaderIncludes().set(defPath, cache);
+				else { 
+					cache = '#pragma include($file)\n$cache\n#pragma endinclude()';
+					FoxCache.shaderIncludes().set(incPath, cache);
+				}
 			}
 			source = includes.replace(source, cache);
 		}
@@ -287,8 +298,9 @@ class FoxShader {
 
 		if(vert == "" && frag == "") return null;
 
-		var shader = FoxShader.fromSources(vert, frag, flags);
+		var shader = new FoxShader();
 		shader.assetsKey = name;
+		FoxShader.fromSources(vert, frag, flags, shader);
 		#if foxlite_verbose
 		FoxLog.log("FoxShader", "Add shader to cache: " + name + defHash);
 		#end
@@ -307,17 +319,15 @@ class FoxShader {
 		While the shader isn't compiled, no uniform should be set, else they will be lost.
 	**/
 	public function compile() {
-		if(program == null) program = context.createProgram(cast 1); // 1 = Context3DProgramFormat.GLSL
-		FoxRenderer.uploadFromGLSLProgram3D(program, __vertSource, __fragSource);
+		if(program != null) return;
+		program = FoxRenderer.createGLProgramFromSources(__vertSource, __fragSource, assetsKey);
 		initCache();
 		__needsCompiling = false;
 	}
 
 	public function initCache() {
 		if(program == null) return;
-		var glProgram = program.__glProgram;
-
-		program.__glslSamplerNames = [];
+		final glProgram = program.glProgram;
 		
 		gl.useProgram(glProgram); 
 		uniformCache.clear();
@@ -334,9 +344,6 @@ class FoxShader {
 				type: info.type,
 				size: info.size
 			});
-
-			program.__glslSamplerNames.push(null);
-			if(info.type == UType.FLOAT_MAT4) program.__glslSamplerNames[a] = name;
 		}
 		
 		attribIdx.position = gl.getAttribLocation(glProgram, "foxlite_Position");
@@ -379,8 +386,8 @@ class FoxShader {
 		var glShadowProgram = gl.createProgram();
 
 		// Link shaders
-		gl.attachShader(glProgram, shaderA.program.__glFragmentShader);
-		gl.attachShader(glProgram, shaderB.program.__glVertexShader);
+		gl.attachShader(glProgram, shaderA.program.glFragmentShader);
+		gl.attachShader(glProgram, shaderB.program.glVertexShader);
 		gl.linkProgram(glProgram);
 
 		gl.linkProgram(glShadowProgram);
@@ -389,10 +396,13 @@ class FoxShader {
 		shader.__fragSource = shaderA.__fragSource;
 		shader.__vertSource = shaderB.__vertSource;
 		shader.__isCombined = true;
-		shader.program = context.createProgram(cast 1); // 1 = Context3DProgramFormat.GLSL
 		shader.shadow = shaderB.shadow; // Use vertex shadow program
 
-		shader.program.__glProgram = glProgram;
+		shader.program = {
+			glProgram: glProgram, 
+			glFragmentShader: shaderA.program.glVertexShader,
+			glVertexShader: shaderB.program.glVertexShader
+		};
 		shader.initCache();
 
 		return shader;
@@ -457,11 +467,11 @@ class FoxShader {
 	}
 
 	public inline function getVertexShaderLog():String {
-		return gl.getShaderInfoLog(program.__glVertexShader);
+		return gl.getShaderInfoLog(program.glVertexShader);
 	}
 
 	public inline function getFragmentShaderLog():String {
-		return gl.getShaderInfoLog(program.__glFragmentShader);
+		return gl.getShaderInfoLog(program.glFragmentShader);
 	}
 	
 	/*
@@ -661,19 +671,23 @@ class FoxShader {
 	}
 
 	public inline function getGLProgram() {
-		return program?.__glProgram;
+		return program?.glProgram;
 	}
 
 	public inline function getGLShadowProgram() {
-		return shadow?.program?.__glProgram;
+		return shadow?.program?.glProgram;
 	}
 
 	public function disposeProgram() {
-		if(!__isCombined) program?.dispose();
+		if(!__isCombined) {
+			GL.deleteProgram(program.glProgram);
+			GL.deleteShader(program.glFragmentShader);
+			GL.deleteShader(program.glVertexShader);
+		}
 		else {
-			program.__glProgram = null;
-			program.__glVertexShader = null;
-			program.__glFragmentShader = null;
+			program.glProgram = null;
+			program.glFragmentShader = null;
+			program.glVertexShader = null;
 		}
 		program = null;
 		shadow?.disposeProgram();

@@ -6,13 +6,16 @@ import StringTools;
 import StringBuf;
 import haxe.ds.List;
 import haxe.ds.StringMap;
+import haxe.ds.GenericStack;
 import foxlite.FoxCache;
 import foxlite.FoxShader;
 import foxlite.culling.BoundingBox;
 import foxlite.instancing.FoxInstanceData;
 import foxlite.lights.FoxLightData;
+import foxlite.loaders.FoxLoaderUtil;
 import foxlite.material.FoxBlendMode;
 import foxlite.material.FoxMaterial;
+import foxlite.material.FoxDepthCompareMode;
 import foxlite.math.FoxMathUtil;
 import foxlite.mesh.FoxMesh;
 import foxlite.mesh.buffer.FoxVertexBufferType;
@@ -34,7 +37,6 @@ import lime.graphics.opengl.GL;
 import lime.utils.DataPointer;
 import lime.utils.Float32Array;
 import openfl.display3D.Context3D;
-import openfl.display3D.Program3D;
 import openfl.display3D.textures.CubeTexture;
 import openfl.display3D.textures.Texture;
 import openfl.geom.Rectangle;
@@ -66,8 +68,15 @@ typedef FoxGLExtensions = {
 	?bptc:Dynamic,
 	// Android
 	?etc1:Dynamic, // gles2
-	?etc2:Dynamic  // gles3
+	?etc2:Dynamic, // gles3
+	// Hardware shadows
+	?shadowSamplers:Dynamic, // gles2
+	// Shaders
+	?programBinary:Dynamic // Shader cache: gles2, gles3, gl3+
 };
+
+// For shader debug
+@:dox(hide) typedef IncludeStackInfo = {line:Int, fileName:String}
 
 // TODO: Make this a singleton so we don't use this many static vars
 class FoxRenderer {
@@ -216,7 +225,8 @@ class FoxRenderer {
 								 ?? GL.getExtension("EXT_draw_buffers")
 								 ?? GL.getExtension("WEBGL_draw_buffers");
 
-		extensions.depthTexture = GL.getExtension("WEBGL_depth_texture"); // Allow the use of gl.DEPTH_STENCIL_ATTACHMENT
+		extensions.depthTexture = GL.getExtension("WEBGL_depth_texture") // Allow the use of gl.DEPTH_STENCIL_ATTACHMENT
+							   ?? GL.getExtension("OES_depth_texture");
 
 		extensions.anisotropic = GL.getExtension("EXT_texture_filter_anisotropic")
   							  ?? GL.getExtension("MOZ_EXT_texture_filter_anisotropic")
@@ -276,6 +286,11 @@ class FoxRenderer {
 			COMPRESSED_RGBA8_ETC2_EAC: 37496
 		};
 		#end
+
+		extensions.shadowSamplers = GL.getExtension("EXT_shadow_samplers");
+
+		extensions.programBinary = GL.getExtension("ARB_get_program_binary")
+							    ?? GL.getExtension("OES_get_program_binary");
 
 		FoxRenderer.compressedTexturesSupported = 
 		  !(extensions.s3tc == null 
@@ -484,6 +499,20 @@ class FoxRenderer {
 		mutex.release();
 	}
 
+	public static function getDepthCompareModeGL(compareMode:FoxDepthCompareMode):Int {
+		var gl = context.gl;
+		return switch(compareMode) {
+			case FoxDepthCompareMode.NEVER: gl.NEVER;
+			case FoxDepthCompareMode.LESS: gl.LESS;
+			case FoxDepthCompareMode.EQUAL: gl.EQUAL;
+			case FoxDepthCompareMode.LESS_EQUAL: gl.LEQUAL;
+			case FoxDepthCompareMode.GREATER: gl.GREATER;
+			case FoxDepthCompareMode.NOT_EQUAL: gl.NOTEQUAL;
+			case FoxDepthCompareMode.GREATER_EQUAL: gl.GEQUAL;
+			default: gl.ALWAYS;
+		}
+	}
+
 	public static function generateMipmap(context:Context3D, texture:FoxTexture) {
 		var gl = context.gl;
 		var glTex = texture.glTexture;
@@ -539,7 +568,7 @@ class FoxRenderer {
 			if(shader.__needsCompiling) shader.compile();
 			if(shader?.shadow?.__needsCompiling == true) shader.shadow.compile();
 
-			GL.useProgram(shader.program.__glProgram);
+			GL.useProgram(shader.program?.glProgram);
 			FoxRenderer.__shader = FoxRenderer.frameCount == 0 ? null : shader; // Fix uniforms not updating before the renderer starts
 		}
 	}
@@ -660,6 +689,11 @@ class FoxRenderer {
 		gl.texParameteri(target, gl.TEXTURE_WRAP_S, wrapModeS);
 		gl.texParameteri(target, gl.TEXTURE_WRAP_T, wrapModeT);
 
+		if(texture.compareMode != null) { // Hardware comparison params
+			GL.texParameteri(gl.TEXTURE_2D, 0x884C, 0x884E); // GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE
+			GL.texParameteri(gl.TEXTURE_2D, 0x884D, getDepthCompareModeGL(texture.compareMode));  // GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL
+		}
+
 		var aniso:Float = switch(texture.filter) {
 			case FoxTextureFilter.ANISOTROPIC2X: 2;
 			case FoxTextureFilter.ANISOTROPIC4X: 4;
@@ -732,7 +766,7 @@ class FoxRenderer {
 		//context.__flushGLViewport();
 
 		//context.__flushGLBlend(); handled by setBlendMode() now
-		//context.__flushGLColor();
+		context.__flushGLColor();
 		context.__flushGLCulling(); 
 		context.__flushGLDepth();
 		//context.__flushGLScissor();
@@ -774,10 +808,9 @@ class FoxRenderer {
 		context.setDepthTest(true, cast 4); // always LESS
 		FoxRenderer.setBlendMode(context, FoxBlendMode.NONE);
 
-		if(material.colorWrite) 
-			context.setColorMask(true, true, true, true);
-		else
-			context.setColorMask(false, false, false, false);
+		// TODO: Enable this for colored shadows
+		context.setColorMask(false, false, false, false);	
+		context.__flushGLColor();
 		
 		// Stencil test
 		var stencil = material.stencil;
@@ -1151,9 +1184,106 @@ class FoxRenderer {
 	}
 
 	/**
+		Creates and compiles a GL program and shaders from sources
+
+		Optionally, an array of include file metadata can be provided for debugging files if compilation fails
+	**/
+	public static function createGLProgramFromSources(vertexSource:String, fragmentSource:String, ?shaderAssetsKey:String):FoxShaderProgramData {
+		var programData:FoxShaderProgramData = {
+			glProgram: null,
+			glFragmentShader: null,
+			glVertexShader: null
+		};
+
+		var vertShader = programData.glVertexShader = GL.createShader(context.gl.VERTEX_SHADER);
+		if(!compileGLShaderDebug(vertShader, vertexSource, shaderAssetsKey)) return null;
+
+		var fragShader = programData.glFragmentShader = GL.createShader(context.gl.FRAGMENT_SHADER);
+		if(!compileGLShaderDebug(fragShader, fragmentSource, shaderAssetsKey)) return null;
+
+		var program = programData.glProgram = GL.createProgram();
+		GL.bindAttribLocation(program, 0, "foxlite_Position");
+
+		GL.attachShader(program, vertShader);
+		GL.attachShader(program, fragShader);
+		GL.linkProgram(program);
+
+		if(GL.getProgramParameter(program, context.gl.LINK_STATUS) == 0) {
+			FoxLog.warning("FoxRenderer", 'Could not link shader program:\n${GL.getProgramInfoLog(program)}');
+			GL.deleteProgram(program);
+			return null;
+		}
+
+		return programData;
+	}
+
+	public static function compileGLShaderDebug(shader:lime.graphics.opengl.GLShader, source:String, ?shaderAssetsKey:String):Bool {
+		GL.shaderSource(shader, source);
+		GL.compileShader(shader);
+		if(GL.getShaderParameter(shader, context.gl.COMPILE_STATUS) == 0) {
+			var log = GL.getShaderInfoLog(shader);
+			var type = GL.getShaderParameter(shader, context.gl.SHADER_TYPE);
+			GL.deleteShader(shader);
+
+			var shaderTypeStr = switch(type) {
+				case 0x8B30: "FRAGMENT";
+				case 0x8B31: "VERTEX";
+				case 0x8DD9: "GEOMETRY";
+				case 0x8E87: "TESSELLATION EVAL";
+				case 0x8E88: "TESSELLATION CTRL";
+				case 0x91B9: "COMPUTE";
+				default: "<unknown type>";
+			}
+
+			var shaderTypeExtStr = switch(type) {
+				case 0x8B30: ".frag";
+				case 0x8B31: ".vert";
+				case 0x8DD9: ".geom";
+				case 0x8E87, 0x8E88: ".tess";
+				default: ".glsl";
+			}
+
+			var e = new EReg('(ERROR|WARNING):\\s+(\\d+):(\\d+):', 'i');
+			var pragmaInclude = new EReg('#pragma\\s+(endinclude|include)\\((.*)\\)', 'i');
+
+			while(e.match(log)) {
+				var ln = Std.parseInt(e.matched(3)); // erroring line
+				var l:Int = 0;
+				var includeStack:GenericStack<IncludeStackInfo> = new GenericStack();
+				includeStack.add({line: 0, fileName: shaderAssetsKey ?? "<anonymous>"});
+
+				var current = includeStack.first();
+				var dumpS = "";
+				FoxLoaderUtil.forEachLineControl(source, line -> {
+					if(pragmaInclude.match(line)) {
+						switch(pragmaInclude.matched(1)) {
+							case "include": includeStack.add({line: -1, fileName: pragmaInclude.matched(2)});
+							case "endinclude": includeStack.pop(); 
+						}
+						current = includeStack.first();
+					}
+					current.line++;
+					dumpS += '${l+1} ${current.line} ${current.fileName} ${line}\n';
+					return (++l) == ln;
+				});
+				sys.io.File.saveContent(haxe.io.Path.withoutDirectory(shaderAssetsKey)+'_dump-${e.matched(1)}.txt', dumpS);
+				var fileName = includeStack.first().fileName;
+				var line = includeStack.first().line;
+				var ext = haxe.io.Path.extension(fileName) == "" ? shaderTypeExtStr : "";
+				log = e.replace(log, '$1: $fileName$ext:$line:');
+			}
+			var msg = 'Error compiling $shaderTypeStr shader: \n$log';
+			FoxLog.log('FoxRenderer', msg);
+			return false;
+		}
+		return true;
+	}
+
+	/**
 	* Uploads vertex and fragment sources for the GLSL program.
 	* This is a cut-down copy of `Program3D.uploadSources()` to remove that annoying prefix and reduce memory usage/processing
 	*/
+	/*
 	public static function uploadFromGLSLProgram3D(program:Program3D, vertexSource:String, fragmentSource:String) {
 		var gl = context.gl;
 		program.__deleteShaders();
@@ -1192,7 +1322,7 @@ class FoxRenderer {
 				getWindow().alert(msg);
 			}
 		}
-	}
+	} */
 
 	public static function setAttributePointerAt(index:Int, buffer:FoxVertexBuffer, bufferOffset:Int=0) {
 		if(index < 0) return;

@@ -143,7 +143,7 @@ void mainVert_basic(void)
 	#endif
 	
 	#elif !defined(UNSHADED) && defined(SHADOW_GLSL) && !defined(SHADOW_PASS)
-	setupShadows(worldPosition);
+	setupShadows(worldPosition, modelViewNormal);
 	#endif
 
 	gl_Position = projection * viewPosition;

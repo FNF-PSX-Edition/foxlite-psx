@@ -32,7 +32,7 @@ class FoxBaseLight extends FoxObject {
 
 		__Note:__ This currently isn't implemented yet
 	**/
-	public var shadowNormalBias:Float = 1.0;
+	public var shadowNormalBias:Float = 0.5;
 
 	/**
 		Controls the blurring of the shadow, gives them a softer or harder look
@@ -41,7 +41,7 @@ class FoxBaseLight extends FoxObject {
 
 		__Note:__ This value corresponds to the pixel area of the shadowmap
 	**/
-	public var shadowBlur:Float = 1.5;
+	public var shadowBlur:Float = 2.5;
 
 	function get_colorHex():FlxColor {
 		return FoxColorUtil.toFlxColor(this.color);

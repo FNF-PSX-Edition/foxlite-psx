@@ -1,5 +1,6 @@
 #extension GL_EXT_shader_framebuffer_fetch : enable
 #extension GL_EXT_gpu_shader4 : enable
+#extension GL_EXT_shadow_samplers : enable
 
 // For MRTs... IF I HAD ONE
 #ifdef GL_ES
@@ -18,9 +19,13 @@ precision mediump int;
 #endif
 #endif
 
-#pragma foxflags
+#include "foxlite/inc/flags.glsl"
 #pragma shadow_program_check
 #pragma optimize(on)
+
+#if defined(GL_ES) && !defined(NO_SHADOW_CODE) && !defined(UNSHADED)
+precision highp sampler2DShadow;
+#endif
 
 // Constants
 #define PI  3.14159265358979
@@ -34,6 +39,9 @@ precision mediump int;
 #define texture2D texture
 #define texture2DLod textureLod
 #define textureCube texture
+// Hardware shadows
+#define shadow2D(tex, c) vec4(texture(tex, c))
+#define shadow2DProj(tex, c) vec4(textureProj(tex, c))
 
 #ifdef VERTEX
 #define attribute in
@@ -52,6 +60,10 @@ out vec4 _GL_DRAW_BUFFERS[1];
 #define gl_FragData _GL_DRAW_BUFFERS
 #define gl_FragColor gl_FragData[0]
 #endif
+#elif defined(GL_ES) && __VERSION__ < 300
+// Hardware shadow extension
+#define shadow2D shadow2DExt
+#define shadow2DProj shadow2DProjExt
 #endif
 
 // -------------------------------------------------
