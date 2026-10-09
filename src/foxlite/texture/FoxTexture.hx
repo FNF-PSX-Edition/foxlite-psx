@@ -78,6 +78,8 @@ class FoxTexture {
 		return glTexture != null;
 	}
 
+	public var onLoaded:Void->Void;
+
 	public var width(get, default):Int;
 	public var height(get, default):Int;
 
@@ -258,6 +260,8 @@ class FoxTexture {
 				tex.__uploadFromImage(image);
 				image = null;
 				foxTex.takeGL(tex);
+				if (foxTex.onLoaded != null)
+					foxTex.onLoaded();
 			}
 
 			if(FoxRenderer.forceSyncLoading)
