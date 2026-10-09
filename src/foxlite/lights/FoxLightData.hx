@@ -343,7 +343,6 @@ class FoxLightData {
 		}
 		if(width > map.width || height > map.height) {
 			map.resize(width, height);
-			map.depthBuffer.filter = FoxTextureFilter.NEAREST;
 		}
 	}
 

@@ -1,5 +1,6 @@
 package foxlite.texture;
 
+import foxlite.material.FoxDepthCompareMode;
 import foxlite.FoxLog;
 import StringTools;
 import haxe.crypto.Base64;
@@ -63,6 +64,13 @@ class FoxTexture {
 	public var wrapMode(default, set):FoxWrapMode;
 	public var filter(default, set):FoxTextureFilter;
 	public var mipFilter(default, set):FoxMipFilter;
+	
+	/**
+		If set, depth comparison parameters will be set for this texture,
+		used in hardware shadows filtering
+	**/
+	public var compareMode(default, set):Null<FoxDepthCompareMode>;
+
 	public var glTexture:TextureBase; // Fix C++ black textures via downcast
 	public var assetsKey:String;
 
@@ -99,6 +107,12 @@ class FoxTexture {
 		if(this.mipFilter == v) return v;
 		__paramsNeedUpdate = true;
 		return this.mipFilter = v;
+	}
+
+	private function set_compareMode(v:Null<FoxDepthCompareMode>):Null<FoxDepthCompareMode> {
+		if(this.compareMode == v) return v;
+		__paramsNeedUpdate = true;
+		return this.compareMode = v;
 	}
 
 	private function get_width():Int {
