@@ -1227,6 +1227,7 @@ class FoxRenderer {
 	}
 
 	public static function compileGLShaderDebug(shader:lime.graphics.opengl.GLShader, source:String, ?shaderAssetsKey:String):Bool {
+		shaderAssetsKey ??= "<anonymous>";
 		GL.shaderSource(shader, source);
 		GL.compileShader(shader);
 		if(GL.getShaderParameter(shader, context.gl.COMPILE_STATUS) == 0) {
@@ -1255,13 +1256,13 @@ class FoxRenderer {
 			var pragmaInclude = new EReg('#pragma\\s+(endinclude|include)\\((.*)\\)', 'i');
 
 			while(e.match(log)) {
-				var ln = Std.parseInt(e.matched(3)); // erroring line
+				var ln = Std.parseInt(e.matched(3)) ?? 0; // erroring line
 				var l:Int = 0;
 				var includeStack:GenericStack<IncludeStackInfo> = new GenericStack();
-				includeStack.add({line: 0, fileName: shaderAssetsKey ?? "<anonymous>"});
+				includeStack.add({line: 0, fileName: shaderAssetsKey});
 
 				var current = includeStack.first();
-				FoxLoaderUtil.forEachLineControl(source, line -> {
+				if(ln != 0) FoxLoaderUtil.forEachLineControl(source, line -> {
 					if(pragmaInclude.match(line)) {
 						switch(pragmaInclude.matched(1)) {
 							case "include": includeStack.add({line: -1, fileName: pragmaInclude.matched(2)});
@@ -1272,8 +1273,9 @@ class FoxRenderer {
 					current.line++;
 					return (++l) == ln;
 				});
-				var fileName = includeStack.first().fileName;
-				var line = includeStack.first().line;
+				current = includeStack.first();
+				var fileName = current.fileName;
+				var line:String = ln == 0 ? "?" : Std.string(current.line);
 				var ext = haxe.io.Path.extension(fileName) == "" ? shaderTypeExtStr : "";
 				log = e.replace(log, '$1: $fileName$ext:$line:');
 			}

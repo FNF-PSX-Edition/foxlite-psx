@@ -83,7 +83,7 @@ void setupShadows(vec4 worldPosition, vec3 normal) {
 			// normal bias
 			vec3 worldPosOffset = normalBias(worldPosition.xyz, normal, L.direction.xyz, L.shadowData[ESHADOW_NORMAL_BIAS]);
 
-			spotShadowLightSpace[i] = viewProjection * worldPosOffset;
+			spotShadowLightSpace[i] = viewProjection * vec4(worldPosOffset, 1);
 		}
 	}
 	#endif
