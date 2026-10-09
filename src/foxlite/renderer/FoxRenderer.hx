@@ -1194,18 +1194,28 @@ class FoxRenderer {
 			glFragmentShader: null,
 			glVertexShader: null
 		};
+		
+		// TODO: Use this until we figure out why is the previous stuff crashing in old drivers
+		var program = context.createProgram(cast 1);
+		@:privateAccess {
+			program.__uploadFromGLSL(vertexSource, fragmentSource);
+			programData.glProgram = program.__glProgram;
+			programData.glVertexShader = program.__glVertexShader;
+			programData.glFragmentShader = program.__glFragmentShader;
+		}
+		
+		/*
+		var vertShader = programData.glVertexShader = GL.createShader(context.gl.VERTEX_SHADER);
+		if(!compileGLShaderDebug(vertShader, vertexSource, shaderAssetsKey)) return null;
 
-		programData.glVertexShader = compileGLShaderDebug(context.gl.VERTEX_SHADER, vertexSource, shaderAssetsKey);
-		if(programData.glVertexShader == null) return null;
-
-		programData.glFragmentShader = compileGLShaderDebug(context.gl.FRAGMENT_SHADER, fragmentSource, shaderAssetsKey);
-		if(programData.glFragmentShader == null) return null;
+		var fragShader = programData.glFragmentShader = GL.createShader(context.gl.FRAGMENT_SHADER);
+		if(!compileGLShaderDebug(fragShader, fragmentSource, shaderAssetsKey)) return null;
 
 		var program = programData.glProgram = GL.createProgram();
 		GL.bindAttribLocation(program, 0, "foxlite_Position");
 
-		GL.attachShader(program, programData.glVertexShader);
-		GL.attachShader(program, programData.glFragmentShader);
+		GL.attachShader(program, vertShader);
+		GL.attachShader(program, fragShader);
 		GL.linkProgram(program);
 
 		if(GL.getProgramParameter(program, context.gl.LINK_STATUS) == 0) {
@@ -1213,15 +1223,14 @@ class FoxRenderer {
 			GL.deleteProgram(program);
 			return null;
 		}
+		*/
 
 		return programData;
 	}
 
-	public static function compileGLShaderDebug(glShaderType:Int, source:String, ?shaderAssetsKey:String):lime.graphics.opengl.GLShader {
-		var shader = GL.createShader(glShaderType);
+	public static function compileGLShaderDebug(shader:lime.graphics.opengl.GLShader, source:String, ?shaderAssetsKey:String):Bool {
 		GL.shaderSource(shader, source);
 		GL.compileShader(shader);
-
 		if(GL.getShaderParameter(shader, context.gl.COMPILE_STATUS) == 0) {
 			var log = GL.getShaderInfoLog(shader);
 			var type = GL.getShaderParameter(shader, context.gl.SHADER_TYPE);
@@ -1272,9 +1281,9 @@ class FoxRenderer {
 			}
 			var msg = 'Error compiling $shaderTypeStr shader: \n$log';
 			FoxLog.log('FoxRenderer', msg);
-			return null;
+			return false;
 		}
-		return shader;
+		return true;
 	}
 
 	public static function setAttributePointerAt(index:Int, buffer:FoxVertexBuffer, bufferOffset:Int=0) {
