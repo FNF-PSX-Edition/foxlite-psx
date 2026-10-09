@@ -262,7 +262,10 @@ class FoxShader {
 					cache = '// MISSING SOURCE: "$file" ($incPath)';
 				}
 				else { 
-					cache = '#pragma include($file)\n$cache\n#pragma endinclude()';
+					cache = '#pragma include(${
+						// replace this with smth better eventually
+						StringTools.replace(StringTools.replace(file, ".", "__"), "/", "#")
+					})\n$cache\n#pragma endinclude()';
 					FoxCache.shaderIncludes().set(incPath, cache);
 				}
 			}

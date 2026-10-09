@@ -1274,7 +1274,8 @@ class FoxRenderer {
 					return (++l) == ln;
 				});
 				current = includeStack.first();
-				var fileName = current.fileName;
+				// replace this with smth better eventually
+				var fileName = StringTools.replace(StringTools.replace(current.fileName, '__', '.'), '#', '/');
 				var line:String = ln == 0 ? "?" : Std.string(current.line);
 				var ext = haxe.io.Path.extension(fileName) == "" ? shaderTypeExtStr : "";
 				log = e.replace(log, '$1: $fileName$ext:$line:');
