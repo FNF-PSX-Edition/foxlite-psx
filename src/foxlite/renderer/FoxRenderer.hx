@@ -331,7 +331,8 @@ class FoxRenderer {
 		MISSING_MATERIAL.textures.set("bitmap", MISSING_TEXTURE);
 		
 		// Super bare minimum shader
-		MISSING_SHADER = FoxShader.fromSources("
+		final GLSL_VERSION = getGLSLVersion();
+		MISSING_SHADER = FoxShader.fromSources('#version $GLSL_VERSION
 		attribute vec4 foxlite_Position;
 		attribute vec2 foxlite_TexCoord;
 
@@ -344,7 +345,7 @@ class FoxRenderer {
 		void main(void) {
 			foxlite_TexCoordv = foxlite_TexCoord*10.;
 			gl_Position = projection * view * model * vec4(foxlite_Position.xyz, 1.0);
-		}", "
+		}', '#version $GLSL_VERSION
 		#ifdef GL_ES
 		#ifdef GL_FRAGMENT_PRECISION_HIGH
 		precision highp float;
@@ -359,8 +360,7 @@ class FoxRenderer {
 
 		void main(void) {
 			gl_FragColor = texture2D(bitmap, foxlite_TexCoordv);
-		}
-		");
+		}');
 		MISSING_MATERIAL.shader = MISSING_SHADER;
 		FoxRenderer.initialized = true;
 		
