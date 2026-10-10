@@ -228,6 +228,7 @@ class FoxShader {
 	// TODO: Test further if this code doesn't give any errors/softlocks
 	public static function processIncludes(source:String):String {
 		var includes = new EReg('((\\/\\/|\\/\\*|\\*)\\s*)*#include\\s+["\'`](.+)["\'`]', "i"); 
+		var pragmaOGLInc = new EReg('#pragma\\s+opengl\\d?', 'g');
 		var list:Array<String> = []; // Keep track of what we've imported, also prevents recursive importing
 		while(includes.match(source)) {
 			var line = includes.matched(0);
@@ -262,7 +263,12 @@ class FoxShader {
 					cache = '// MISSING SOURCE: "$file" ($incPath)';
 				}
 				else { 
-					cache = '#pragma include($file)\n$cache\n#pragma endinclude()';
+					// If using main sources as include, remove version pragmas
+					cache = pragmaOGLInc.replace(cache, "");
+					cache = '#pragma include(${
+						// replace this with smth better eventually
+						StringTools.replace(StringTools.replace(file, ".", "__"), "/", "#")
+					})\n$cache\n#pragma endinclude()';
 					FoxCache.shaderIncludes().set(incPath, cache);
 				}
 			}
