@@ -33,14 +33,15 @@ class FoxMTLLoader {
 		
 		@returns A Map containing the materials inside the MTL by their name.
 	**/
-	public static function load(name:String, ?extraShaderFlags:Array<String>, ?customShaderPath:String):Map<String, FoxMaterial> {
+	public static function load(name:String, ?extraShaderFlags:Array<String>, ?customShaderPath:String, ?texturePath:String):Map<String, FoxMaterial> {
 		if(FoxCache.materialLibs().exists(name)) return FoxCache.materialLibs().get(name);
 		var mtl = FoxLoaderUtil.loadText(name);
 		if(mtl == null) {
 			FoxLog.warning('FoxOBJLoader', 'Could not load MTL: ${name} (Not found.)');
 			return null;
 		}
-		var dir = Path.directory(name) + '/';
+
+		final dir:String = (texturePath ?? Path.directory(name)) + '/';
 
 		if(extraShaderFlags == null) extraShaderFlags = [];
 

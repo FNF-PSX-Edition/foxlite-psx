@@ -51,6 +51,7 @@ class FoxCamera extends FoxObject {
 	public var __invViewMatrix:Matrix3D = new Matrix3D();
 	public var projectionMatrix:Matrix3D = new Matrix3D();
 	public var __invProjectionMatrix:Matrix3D = new Matrix3D(); // For raytracing effects
+	public var __invSkyViewMatrix:Matrix3D = new Matrix3D();
 
 	/**
 		Origin of the screen to where a perspective or isometric view would rotate
@@ -95,6 +96,9 @@ class FoxCamera extends FoxObject {
 	**/
 	public var environment:FoxEnvironment;
 
+	public final __invProjectionData:Array<Float> = [for (i in 0...16) 0.0];
+	public final __invSkyViewData:Array<Float> = [for (i in 0...16) 0.0];
+
 	public function new(x:Float=0, y:Float=0, z:Float=0, _bgColor:FlxColor=0x0, ortho:Bool=false, withLightData:Bool=true) {
 		super(x, y, z);
 		rotationOrder = EulerOrder.ZXY;
@@ -111,6 +115,21 @@ class FoxCamera extends FoxObject {
 		// Create from transform so other influences can affect the camera
 		if(FoxRenderer.calculateMotionVectors) __prevViewMatrix.copyRawDataFrom(viewMatrix.rawData);
 		FoxMathUtil.viewMatrixFromTransform(viewMatrix, transform);
+
+		__invSkyViewMatrix.copyRawDataFrom(viewMatrix.rawData);
+		__invSkyViewMatrix.invert();
+
+		var skyData = __invSkyViewMatrix.rawData;
+		skyData[12] = 0;
+		skyData[13] = 0;
+		skyData[14] = 0;
+		skyData[15] = 1;
+		__invSkyViewMatrix.copyRawDataFrom(skyData);
+
+		for (i in 0...16) {
+			__invProjectionData[i] = __invProjectionMatrix.rawData[i];
+			__invSkyViewData[i] = __invSkyViewMatrix.rawData[i];
+		}
 
 		var updateOffset = !projectionOrigin.equals(__lastProjectionOrigin);
 		if(__updateProjection || updateOffset) {
